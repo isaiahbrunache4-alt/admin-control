@@ -2,7 +2,7 @@
 
 **Status: draft, for review. Nothing is implemented.** Written 2026-10-16;
 **revised 2026-10-16** to add the PC-layer lock and the "any device" model (§3, §7.2,
-§8, §9).
+§8, §9); build order changed to PC lock last, and Windows Home noted (§11, §13).
 Items that are assumptions rather than stated requirements are marked **assumed**.
 Decisions still needed before code is written are listed in §12.
 
@@ -320,16 +320,20 @@ unlocked is an option (§12).
 |---|---|---|
 | 1 | Core: rules database, password, signing, CLI | Signed bundle produced and verified in tests |
 | 2 | Console: Dashboard, Block lists, Schedules, Lock/Unlock | Rules edited and locked from the UI |
-| 3 | **Windows Agent (PC layer)**: verify rules, website + app blocking, schedules | A site and a program are blocked on the PC on schedule; only a Console unlock changes it |
-| 4 | Android Agent: receive + verify rules, app blocking | Blocked app won't open on the tablet |
-| 5 | Android Agent: website filter, schedules, offline | Site blocked on schedule with Wi-Fi off |
-| 6 | Android device-management setup + check-ins | Agent cannot be removed on the device; Console shows check-ins |
-| 7 | Pixel enrolment, Windows standard account switch-over, self-control options | All three devices enforced from one Console |
+| 3 | Android Agent: receive + verify rules, app blocking | Blocked app won't open on the tablet |
+| 4 | Android Agent: website filter, schedules, offline | Site blocked on schedule with Wi-Fi off |
+| 5 | Android device-management setup + check-ins | Agent cannot be removed on the tablet; Console shows check-ins |
+| 6 | Pixel enrolment, self-control options | Pixel and tablet enforced from one Console |
+| 7 | **Windows Agent (PC layer)**: verify rules, website + program blocking, schedules | A site and a program are blocked on the PC on schedule; only a Console unlock changes it |
+| 8 | Windows standard-account switch-over | Daily use on a standard account; the PC layer cannot be stopped from it |
 
-The PC layer comes first because it needs no factory reset. Android is tested on the
-**tablet first**, so the Pixel (daily phone) is not reset until the system is proven.
-The switch to a standard Windows account happens last, once the Console is trusted.
-Getting locked out of your own development PC mid-build would be costly.
+**The other devices' Agents come first, the PC lock last** (decided 2026-10-16). The
+PC is the development machine for Fortress itself (and for ExVelo), so it stays
+unrestricted until everything else is proven. Locking the PC is then the final step,
+done once the Console and the password flow are trusted.
+
+Android is tested on the **tablet first**, so the Pixel (daily phone) is not reset
+until the system is proven.
 
 ---
 
@@ -343,5 +347,20 @@ Getting locked out of your own development PC mid-build would be costly.
 | USB debugging and terminals | Always / only while unlocked | Always (ExVelo work), logged |
 | Separate block lists for the PC, or shared lists? | Shared / per device | Shared lists, per-device schedules |
 | Auto-relock time, amber/red thresholds | 15 min, 24 h, 72 h | Confirm |
-| Lenovo Idea Tab exact model and Android version | — | Needed before Phase 4 |
-| Windows edition on the PC (Home / Pro) | — | Needed before Phase 3: some management features differ |
+| Lenovo Idea Tab exact model and Android version | — | Needed before Phase 3 |
+| Activate Windows before Phase 7? | Yes / no | Answer before Phase 7 (§13) |
+
+---
+
+## 13. The PC: Windows Home, not activated
+
+Recorded 2026-10-16. This only affects Phases 7 and 8 (the PC layer).
+
+| Fact | Effect on the PC layer |
+|---|---|
+| **Windows Home** has no Group Policy editor and no AppLocker (those are Pro-only) | The Windows Agent cannot hand program blocking to Windows. It detects and stops blocked programs itself. Settings that Pro would set through Group Policy are written directly where the program reads them |
+| Browser policies (Chrome, Edge, Firefox) | These are read from the registry or policy files, so they are not tied to Group Policy. Whether every policy Fortress needs is honoured on an unmanaged Home PC is **unverified**. Check each one in Phase 7 |
+| Standard (non-admin) accounts | Available on Home. §7.2 is unchanged |
+| **Not activated** | Mainly locks personalization settings and shows a watermark. Effect on accounts, services and browser policies is **unverified**. Check before Phase 7. Activating avoids the question |
+
+None of this blocks Phases 1 to 6.
