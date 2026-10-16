@@ -1,0 +1,26 @@
+[project]
+name = "fortress-core"
+version = "0.1.0"
+description = "Fortress Core: rules, password, signing and schedules (Spec 01, Phase 1)"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=42",
+    "argon2-cffi>=23",
+    "tzdata",            # zoneinfo has no time-zone database of its own on Windows
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+fortress = "fortress_core.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["fortress_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
