@@ -1,7 +1,7 @@
 # Fortress — Software Design (Spec 01, draft)
 
-**Status: draft, for review. Phase 1 (Core) is implemented in `core/`; nothing else
-is.** Written 2026-10-16;
+**Status: draft, for review. Phase 1 (Core, `core/`) and Phase 2 (Console,
+`console/`) are implemented; the Agents are not.** Written 2026-10-16;
 **revised 2026-10-16** to add the PC-layer lock and the "any device" model (§3, §7.2,
 §8, §9); build order changed to PC lock last, and Windows Home noted (§11, §13).
 Items that are assumptions rather than stated requirements are marked **assumed**.

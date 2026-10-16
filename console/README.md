@@ -1,17 +1,12 @@
-# fortress_console
+# Fortress Console
 
-Fortress Console: the main UI (Spec 01 §5)
+The main UI for Fortress (Spec 01 §5): a Flutter Windows desktop app that talks to
+Fortress Core on `127.0.0.1:47800`. See the top-level [README](../README.md) for how
+to run it and its tests.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| File | What |
+|---|---|
+| `lib/api.dart` | Client for Core's localhost API |
+| `lib/models.dart` | Typed views of Core's status and rules |
+| `lib/state.dart` | Polls Core; runs every action |
+| `lib/ui/` | Lock bar, setup/unlock, and the seven screens |
