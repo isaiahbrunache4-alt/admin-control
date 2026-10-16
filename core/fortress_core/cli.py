@@ -237,6 +237,13 @@ def cmd_check(f, args):
     return 0 if not blocked else 3
 
 
+def cmd_serve(f, args):
+    """Run Core for the Console, on localhost only."""
+    from .api import serve
+    print(f"Fortress Core on http://127.0.0.1:{args.port} (Ctrl+C to stop)")
+    serve(f, args.port)
+
+
 def cmd_activity(f, args):
     for a in reversed(f.store.activity(args.limit)):
         print(f"{a['at']}  {a['kind']:<15} {a['detail']}")
@@ -313,6 +320,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     x = sub.add_parser("activity", help="recent activity log")
     x.add_argument("--limit", type=int, default=50); x.set_defaults(func=cmd_activity)
+
+    x = sub.add_parser("serve", help="run Core for the Console (localhost only)")
+    x.add_argument("--port", type=int, default=47800); x.set_defaults(func=cmd_serve)
     return p
 
 
@@ -320,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     f = Fortress(args.db or default_db())
     try:
-        if args.command != "init" and not f.is_set_up:
+        if args.command not in ("init", "serve") and not f.is_set_up:
             raise FortressError("Fortress is not set up; run `fortress init`")
         return args.func(f, args) or 0
     except (FortressError, RuleError, bundle.BundleRejected) as e:

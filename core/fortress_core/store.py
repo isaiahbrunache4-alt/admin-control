@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS activity (
 class Store:
     def __init__(self, path: str | Path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(path))
+        # The API serialises every request behind one lock, so sharing across threads is safe.
+        self.db = sqlite3.connect(str(path), check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(_SCHEMA)
         if self.get("schema_version") is None:
