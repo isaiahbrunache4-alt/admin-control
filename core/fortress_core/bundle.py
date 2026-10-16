@@ -57,7 +57,12 @@ class BundleVerifier:
             raise BundleRejected("malformed envelope") from None
         if not crypto.verify(self.pub_raw, data, sig):
             raise BundleRejected("bad signature")
-        payload = json.loads(data)
+        try:
+            payload = json.loads(data)
+        except ValueError:
+            raise BundleRejected("payload is not JSON") from None
+        if not isinstance(payload, dict) or type(payload.get("version")) is not int:
+            raise BundleRejected("payload has no version")
         if payload["version"] <= self.highest_version:
             raise BundleRejected(
                 f"version {payload['version']} is not newer than {self.highest_version}"

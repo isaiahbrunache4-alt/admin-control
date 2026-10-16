@@ -98,6 +98,14 @@ class Store:
             )
         return cur.rowcount == 1
 
+    def touch_device(self, device_id: str, seen_at: str) -> bool:
+        with self.db:
+            cur = self.db.execute(
+                "UPDATE devices SET last_seen = ? WHERE id = ? AND released = 0",
+                (seen_at, device_id),
+            )
+        return cur.rowcount == 1
+
     # activity
     def log(self, at: str, kind: str, detail: str = "") -> None:
         with self.db:
