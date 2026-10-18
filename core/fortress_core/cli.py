@@ -8,6 +8,7 @@ import argparse
 import getpass
 import json
 import os
+import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -24,9 +25,15 @@ KIND_ALIASES = {
 }
 
 
-def default_db() -> Path:
-    if os.name == "nt":
-        return Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Fortress" / "fortress.db"
+def default_db(windows: bool = os.name == "nt") -> Path:
+    """FORTRESS_DB if set. Otherwise per-user: Core runs as you until it becomes a Windows
+    service (Spec 01 §11, Phase 7), which will keep its data under %PROGRAMDATA%. A plain
+    (non-elevated) window cannot write there on an administrator account."""
+    if os.environ.get("FORTRESS_DB"):
+        return Path(os.environ["FORTRESS_DB"])
+    if windows:
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        return Path(base) / "Fortress" / "fortress.db"
     return Path.home() / ".fortress" / "fortress.db"
 
 
@@ -348,7 +355,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    f = Fortress(args.db or default_db())
+    path = args.db or default_db()
+    try:
+        f = Fortress(path)
+    except (sqlite3.Error, OSError) as e:
+        print(f"fortress: cannot open the database at {path} ({e}).\n"
+              "Choose another place with --db PATH or the FORTRESS_DB environment variable.",
+              file=sys.stderr)
+        return 2
     try:
         if args.command not in ("init", "serve") and not f.is_set_up:
             raise FortressError("Fortress is not set up; run `fortress init`")

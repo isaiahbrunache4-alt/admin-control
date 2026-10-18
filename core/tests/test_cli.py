@@ -73,3 +73,21 @@ def test_cli_flow(run, tmp_path):
     env = json.loads(out_file.read_text())
     assert run("verify", str(out_file), "--pubkey", pub)[0] == 0
     assert env["format"] == 1
+
+
+def test_fortress_db_env_and_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("FORTRESS_DB", str(tmp_path / "x" / "f.db"))
+    assert cli.default_db() == tmp_path / "x" / "f.db"
+    monkeypatch.delenv("FORTRESS_DB")
+    monkeypatch.setenv("LOCALAPPDATA", "/users/someone/AppData/Local")
+    assert cli.default_db(windows=True).as_posix() == "/users/someone/AppData/Local/Fortress/fortress.db"
+    assert cli.default_db(windows=False).name == "fortress.db"
+
+
+def test_unopenable_database_is_a_clear_error(tmp_path, capsys):
+    # A directory where the database file should be: SQLite cannot open it.
+    code = cli.main(["--db", str(tmp_path), "status"])
+    err = capsys.readouterr().err
+    assert code == 2
+    assert "cannot open the database" in err and "FORTRESS_DB" in err
+    assert "Traceback" not in err

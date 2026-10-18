@@ -52,8 +52,10 @@ fortress status | show | activity | passwd | recover
 ```
 
 Every changing command asks for the password, makes the change, then locks and
-publishes a new signed bundle. The database defaults to `%PROGRAMDATA%\Fortress\fortress.db`
-on Windows and `~/.fortress/fortress.db` elsewhere (`--db` to override).
+publishes a new signed bundle. The database defaults to `%LOCALAPPDATA%\Fortress\fortress.db`
+on Windows and `~/.fortress/fortress.db` elsewhere; `--db PATH` or the `FORTRESS_DB`
+environment variable choose another. (When Core becomes a Windows service in Phase 7, its
+data moves under `%PROGRAMDATA%`.)
 
 ## Console (Phase 2)
 
