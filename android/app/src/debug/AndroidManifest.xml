@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds are test-only: as device owner they can still be removed over USB with
+     `adb shell dpm remove-active-admin com.fortress.agent/.FortressAdminReceiver`.
+     Release builds cannot be removed that way. Install with `adb install -t`. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:testOnly="true" />
+</manifest>
