@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import crypto, rules
+from .agents import DEFAULT_AGENT_PORT, create_agent_app, lan_addresses
 from .bundle import BundleRejected
 from .core import Fortress, FortressError, Locked, NotSetUp, TooSoon, WrongPassword
 from .rules import RuleError
@@ -106,13 +107,15 @@ def _fortress_error(request: Request, e: FortressError) -> JSONResponse:
 
 # ---- the app --------------------------------------------------------------------------
 
-def create_app(fortress: Fortress) -> FastAPI:
+def create_app(fortress: Fortress, guard: threading.Lock | None = None,
+               agent_port: int = DEFAULT_AGENT_PORT) -> FastAPI:
     app = FastAPI(title="Fortress Core", docs_url=None, redoc_url=None, openapi_url=None)
     # Refuse any Host but localhost, so a web page cannot reach this through DNS rebinding.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     app.state.fortress = fortress
-    # One SQLite connection and one unlocked key: serialise every request on them.
-    guard = threading.Lock()
+    # One SQLite connection and one unlocked key: serialise every request on them,
+    # including the Agents' (agents.py shares this lock when both run).
+    guard = guard or threading.Lock()
     session = {"token": None}
 
     app.add_exception_handler(FortressError, _fortress_error)
@@ -154,6 +157,8 @@ def create_app(fortress: Fortress) -> FastAPI:
                 "id": d["id"], "name": d["name"], "platform": d["platform"],
                 "added_at": d["added_at"], "last_seen": d["last_seen"],
                 "status": f.device_status(d), "active_schedules": blocks.schedule_ids,
+                "enrolled": bool(d["public_key"]), "enrolled_at": d["enrolled_at"],
+                "version_held": d["version_held"], "agent_version": d["agent_version"],
             })
         unlocks_at = f.unlocks_at
         return {
@@ -280,6 +285,12 @@ def create_app(fortress: Fortress) -> FastAPI:
         f.remove_device(device_id)
         return done(f)
 
+    @app.post(API + "/devices/{device_id}/enrolment")
+    def start_enrolment(device_id: str, f: Fortress = editor):
+        code, expires = f.start_enrolment(device_id)
+        return {"code": code, "expires_at": rules.format_utc(expires), "device_id": device_id,
+                "port": agent_port, "addresses": lan_addresses(), "key_id": crypto.key_id(f.public_key)}
+
     @app.post(API + "/publish")
     def publish(f: Fortress = editor):
         f.publish()
@@ -316,7 +327,22 @@ def _published_rules(f: Fortress) -> dict:
     return json.loads(crypto.b64d(env["payload"]))["rules"]
 
 
-def serve(fortress: Fortress, port: int = DEFAULT_PORT) -> None:
+def serve(fortress: Fortress, port: int = DEFAULT_PORT, agent_host: str | None = "0.0.0.0",
+          agent_port: int = DEFAULT_AGENT_PORT) -> None:
+    """The Console's API on localhost and, unless agent_host is None, the Agents' API
+    on the home network, in one process sharing one lock."""
+    import asyncio
+
     import uvicorn
 
-    uvicorn.run(create_app(fortress), host="127.0.0.1", port=port, log_level="warning")
+    guard = threading.Lock()
+    servers = [uvicorn.Server(uvicorn.Config(
+        create_app(fortress, guard, agent_port), host="127.0.0.1", port=port, log_level="warning"))]
+    if agent_host is not None:
+        servers.append(uvicorn.Server(uvicorn.Config(
+            create_agent_app(fortress, guard), host=agent_host, port=agent_port, log_level="warning")))
+
+    async def run_all():
+        await asyncio.gather(*(s.serve() for s in servers))
+
+    asyncio.run(run_all())

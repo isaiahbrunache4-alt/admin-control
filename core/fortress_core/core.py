@@ -415,6 +415,22 @@ class Fortress:
         self._edit(change)
         self.publish()
 
+    def start_enrolment(self, device_id: str) -> tuple[str, datetime]:
+        """Make a one-time enrolment code for a device (docs/agent_protocol.md §2).
+        Needs an unlock, so nothing joins Fortress without the password. Any earlier
+        code for the device stops working; any earlier device key stays until replaced."""
+        from .agents import enrol_key, enrolment_expiry, new_enrolment_code
+
+        self._require_unlocked()
+        device = self.store.device(device_id)
+        if device is None or device["released"]:
+            raise RuleError(f"no device {device_id!r}")
+        code = new_enrolment_code()
+        expires = enrolment_expiry(self._now())
+        self.store.put_enrolment(device_id, enrol_key(code).hex(), rules.format_utc(expires))
+        self._log("enrolment_started", f"{device_id}, code valid until {rules.format_utc(expires)}")
+        return code, expires
+
     def check_in(self, device_id: str) -> None:
         """Record that a device reached Core (Spec 01 §7.4). Needs no unlock."""
         if not self.store.touch_device(device_id, self._ts()):

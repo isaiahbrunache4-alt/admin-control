@@ -9,7 +9,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -35,7 +35,21 @@ CREATE TABLE IF NOT EXISTS activity (
     kind   TEXT NOT NULL,
     detail TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS enrolments (
+    device_id  TEXT PRIMARY KEY,
+    key        TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    failures   INTEGER NOT NULL DEFAULT 0
+);
 """
+
+# Columns added to `devices` after schema 1, for Agents (docs/agent_protocol.md).
+_DEVICE_COLUMNS = {
+    "public_key": "TEXT",          # base64 SPKI DER, P-256
+    "enrolled_at": "TEXT",
+    "version_held": "INTEGER",
+    "agent_version": "TEXT",
+}
 
 
 class Store:
@@ -45,8 +59,12 @@ class Store:
         self.db = sqlite3.connect(str(path), check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(_SCHEMA)
-        if self.get("schema_version") is None:
-            self.set("schema_version", SCHEMA_VERSION)
+        have = {r["name"] for r in self.db.execute("PRAGMA table_info(devices)")}
+        with self.db:
+            for col, kind in _DEVICE_COLUMNS.items():
+                if col not in have:
+                    self.db.execute(f"ALTER TABLE devices ADD COLUMN {col} {kind}")
+        self.set("schema_version", SCHEMA_VERSION)
 
     def close(self) -> None:
         self.db.close()
@@ -106,6 +124,53 @@ class Store:
                 (seen_at, device_id),
             )
         return cur.rowcount == 1
+
+    def device(self, device_id: str) -> dict | None:
+        row = self.db.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
+        return None if row is None else dict(row)
+
+    def set_device_key(self, device_id: str, public_key: str, enrolled_at: str) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE devices SET public_key = ?, enrolled_at = ?, version_held = NULL "
+                "WHERE id = ?",
+                (public_key, enrolled_at, device_id),
+            )
+
+    def record_check_in(self, device_id: str, seen_at: str, version: int, agent_version: str) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE devices SET last_seen = ?, version_held = ?, agent_version = ? WHERE id = ?",
+                (seen_at, version, agent_version, device_id),
+            )
+
+    # enrolment codes
+    def put_enrolment(self, device_id: str, key: str, expires_at: str) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO enrolments(device_id, key, expires_at) VALUES(?, ?, ?) "
+                "ON CONFLICT(device_id) DO UPDATE SET key = excluded.key, "
+                "expires_at = excluded.expires_at, failures = 0",
+                (device_id, key, expires_at),
+            )
+
+    def enrolment(self, device_id: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT * FROM enrolments WHERE device_id = ?", (device_id,)
+        ).fetchone()
+        return None if row is None else dict(row)
+
+    def count_enrolment_failure(self, device_id: str) -> int:
+        with self.db:
+            self.db.execute(
+                "UPDATE enrolments SET failures = failures + 1 WHERE device_id = ?", (device_id,)
+            )
+        e = self.enrolment(device_id)
+        return 0 if e is None else e["failures"]
+
+    def delete_enrolment(self, device_id: str) -> None:
+        with self.db:
+            self.db.execute("DELETE FROM enrolments WHERE device_id = ?", (device_id,))
 
     # activity
     def log(self, at: str, kind: str, detail: str = "") -> None:

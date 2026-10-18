@@ -180,6 +180,15 @@ def cmd_device_remove(f, args):
 
 
 @_edit
+def cmd_device_enrol(f, args):
+    from .agents import lan_addresses
+    code, expires = f.start_enrolment(args.id)
+    print(f"Enrolment code for {args.id}:  {code}")
+    print(f"Valid until {rules.format_utc(expires)}, once.")
+    print(f"Core addresses: {', '.join(lan_addresses()) or '(none found)'}, port 47801")
+
+
+@_edit
 def cmd_publish(f, args):
     f.publish()
 
@@ -238,10 +247,15 @@ def cmd_check(f, args):
 
 
 def cmd_serve(f, args):
-    """Run Core for the Console, on localhost only."""
+    """Run Core: the Console's API on localhost, the Agents' on the home network."""
     from .api import serve
-    print(f"Fortress Core on http://127.0.0.1:{args.port} (Ctrl+C to stop)")
-    serve(f, args.port)
+    print(f"Console API on http://127.0.0.1:{args.port}")
+    if args.no_agents:
+        print("Agent API off")
+    else:
+        print(f"Agent API on http://{args.agent_host}:{args.agent_port}")
+    print("Ctrl+C to stop")
+    serve(f, args.port, None if args.no_agents else args.agent_host, args.agent_port)
 
 
 def cmd_activity(f, args):
@@ -298,6 +312,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.set_defaults(func=cmd_device_add)
     x = dev.add_parser("remove", help="send a signed release")
     x.add_argument("id"); x.set_defaults(func=cmd_device_remove)
+    x = dev.add_parser("enrol", help="make a one-time enrolment code for a device's Agent")
+    x.add_argument("id"); x.set_defaults(func=cmd_device_enrol)
 
     sub.add_parser("publish", help="sign and publish the rules now").set_defaults(func=cmd_publish)
     sub.add_parser("passwd", help="change the password").set_defaults(func=cmd_passwd)
@@ -321,8 +337,12 @@ def build_parser() -> argparse.ArgumentParser:
     x = sub.add_parser("activity", help="recent activity log")
     x.add_argument("--limit", type=int, default=50); x.set_defaults(func=cmd_activity)
 
-    x = sub.add_parser("serve", help="run Core for the Console (localhost only)")
-    x.add_argument("--port", type=int, default=47800); x.set_defaults(func=cmd_serve)
+    x = sub.add_parser("serve", help="run Core for the Console and the Agents")
+    x.add_argument("--port", type=int, default=47800, help="Console API, localhost only")
+    x.add_argument("--agent-host", default="0.0.0.0", help="address the Agent API listens on")
+    x.add_argument("--agent-port", type=int, default=47801)
+    x.add_argument("--no-agents", action="store_true", help="run the Console API only")
+    x.set_defaults(func=cmd_serve)
     return p
 
 
