@@ -21,12 +21,20 @@ blocking) built and tested off-device; next is trying it on the tablet
 
 ## Core (Phase 1)
 
-```
+On Windows, in a normal (not administrator) PowerShell, in a folder you own such as your
+home folder. Use Python from python.org (`winget install -e --id Python.Python.3.13`),
+not the Microsoft Store one: Core will later run as a Windows service, which the Store
+Python cannot do.
+
+```powershell
 cd core
-python -m venv .venv
-.venv/bin/pip install -e '.[test]'     # Windows: .venv\Scripts\pip
-.venv/bin/pytest
+& "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe" -m venv .venv
+.\.venv\Scripts\pip install -e ".[test]"
+.\.venv\Scripts\pytest
+.\.venv\Scripts\fortress init
 ```
+
+Elsewhere: `python -m venv .venv && .venv/bin/pip install -e '.[test]' && .venv/bin/pytest`.
 
 The `fortress` command stands in for the Console until Phase 2:
 
