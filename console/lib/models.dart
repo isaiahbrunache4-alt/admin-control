@@ -74,6 +74,9 @@ class Device {
     this.lastSeen,
     this.status = 'never',
     this.activeSchedules = const [],
+    this.enrolled = false,
+    this.versionHeld,
+    this.agentVersion,
   });
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -83,6 +86,9 @@ class Device {
     lastSeen: _time(j['last_seen']),
     status: j['status'] as String? ?? 'never',
     activeSchedules: _strings(j['active_schedules']),
+    enrolled: j['enrolled'] == true,
+    versionHeld: j['version_held'] as int?,
+    agentVersion: j['agent_version'] as String?,
   );
 
   final String id;
@@ -91,6 +97,41 @@ class Device {
   final DateTime? lastSeen;
   final String status; // ok | amber | red | never
   final List<String> activeSchedules;
+
+  /// The device's Agent has enrolled with Core (docs/agent_protocol.md §2).
+  final bool enrolled;
+
+  /// Highest rules version the Agent reported at its last check-in.
+  final int? versionHeld;
+  final String? agentVersion;
+}
+
+/// A one-time enrolment code, from the unlocked Console (docs/agent_protocol.md §2).
+class Enrolment {
+  Enrolment({
+    required this.deviceId,
+    required this.code,
+    required this.expiresAt,
+    required this.addresses,
+    required this.port,
+    required this.keyId,
+  });
+
+  factory Enrolment.fromJson(Map<String, dynamic> j) => Enrolment(
+    deviceId: j['device_id'] as String,
+    code: j['code'] as String,
+    expiresAt: DateTime.parse(j['expires_at'] as String),
+    addresses: _strings(j['addresses']),
+    port: j['port'] as int,
+    keyId: j['key_id'] as String,
+  );
+
+  final String deviceId;
+  final String code;
+  final DateTime expiresAt;
+  final List<String> addresses;
+  final int port;
+  final String keyId;
 }
 
 class Rules {

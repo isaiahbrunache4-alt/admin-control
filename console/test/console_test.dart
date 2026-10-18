@@ -4,6 +4,7 @@ import 'package:fortress_console/api.dart';
 import 'package:fortress_console/models.dart';
 import 'package:fortress_console/state.dart';
 import 'package:fortress_console/ui/app.dart';
+import 'package:fortress_console/ui/dashboard.dart';
 
 import 'fake_core.dart';
 
@@ -163,13 +164,50 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Add'));
     await tester.pumpAndSettle();
     expect(core.devices.single['id'], 'lenovo-idea-tab');
+    expect(find.textContaining('Agent not enrolled'), findsOneWidget);
+
+    // Enrol: the code, the PC's address and the device id, to type on the tablet.
+    await tester.tap(find.byKey(const ValueKey('enrol-lenovo-idea-tab')));
+    await tester.pumpAndSettle();
+    expect(find.text('Enrol Lenovo Idea Tab'), findsOneWidget);
+    expect(find.text('ABCDE-FGHJK'), findsOneWidget);
+    expect(find.text('192.168.1.20'), findsOneWidget);
+    expect(find.text('lenovo-idea-tab'), findsWidgets);
+    await tester.tap(find.widgetWithText(FilledButton, 'Done'));
+    await tester.pumpAndSettle();
 
     await go(tester, 'Dashboard');
     expect(find.text('Lenovo Idea Tab'), findsOneWidget);
-    expect(find.text('Never checked in'), findsOneWidget);
+    expect(find.text('Never checked in\nAgent not enrolled'), findsOneWidget);
+  });
+
+  testWidgets('enrolling needs the unlock', (tester) async {
+    final (core, _) = await boot(tester);
+    await unlock(tester, 'right password');
+    await go(tester, 'Devices');
+    await tester.tap(find.widgetWithText(FilledButton, 'Add device'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('device-name')), 'tablet');
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.pumpAndSettle();
+    core.relock();
+    await tester.tap(find.byKey(const ValueKey('enrol-tablet')));
+    await tester.pumpAndSettle();
+    expect(find.text('Fortress is locked. Unlock to make changes.'), findsOneWidget);
+    expect(find.text('Enrol tablet'), findsNothing);
+    expect(lockState(tester), 'Locked');
   });
 
   group('models', () {
+    test('agent status line', () {
+      Device d({bool enrolled = true, int? held}) =>
+          Device(id: 'tablet', name: 'Tab', platform: 'android', enrolled: enrolled, versionHeld: held);
+      expect(agentText(d(enrolled: false), 5), 'Agent not enrolled');
+      expect(agentText(d(), 5), 'Agent enrolled · no check-in yet');
+      expect(agentText(d(held: 4), 5), startsWith('Agent has rules v4 of v5'));
+      expect(agentText(d(held: 5), 5), 'Agent up to date (rules v5)');
+    });
+
     test('describeDays', () {
       expect(describeDays(['fri', 'mon', 'tue', 'wed', 'thu']), 'Mon–Fri');
       expect(describeDays(['sat', 'sun']), 'Weekends');

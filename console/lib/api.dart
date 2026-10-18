@@ -113,6 +113,9 @@ class FortressApi {
       _post('devices', {'id': id, 'name': name, 'platform': platform});
   Future<Json> removeDevice(String id) => _send('DELETE', 'devices/${_seg(id)}').then(_json);
 
+  /// A one-time code for the device's Agent to enrol with. Needs the unlock.
+  Future<Json> startEnrolment(String id) => _post('devices/${_seg(id)}/enrolment');
+
   Future<Json> publish() => _post('publish');
 
   Future<Json> settings({int? unlockDelayMinutes, int? relockMinutes}) =>

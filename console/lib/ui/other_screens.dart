@@ -98,11 +98,20 @@ class DevicesScreen extends StatelessWidget {
                     ),
                     title: Text(d.name),
                     subtitle: Text(
-                      '${d.id} · ${d.platform == 'windows' ? 'Windows' : 'Android'} · ${deviceStatusText(d)}',
+                      '${d.id} · ${d.platform == 'windows' ? 'Windows' : 'Android'} · ${deviceStatusText(d)}\n'
+                      '${agentText(d, status.version)}',
                     ),
-                    trailing: TextButton(
-                      onPressed: canEdit ? () => _remove(context, d) : null,
-                      child: const Text('Remove'),
+                    isThreeLine: true,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          key: ValueKey('enrol-${d.id}'),
+                          onPressed: canEdit ? () => _enrol(context, d) : null,
+                          child: Text(d.enrolled ? 'Re-enrol' : 'Enrol'),
+                        ),
+                        TextButton(onPressed: canEdit ? () => _remove(context, d) : null, child: const Text('Remove')),
+                      ],
                     ),
                   ),
               ],
@@ -110,12 +119,34 @@ class DevicesScreen extends StatelessWidget {
           ),
         const SizedBox(height: 16),
         Text(
-          'Adding a device here reserves its place. Each device is then enrolled with its Agent, '
-          'which arrives in a later phase.',
+          'Add a device here, then Enrol it: the device\'s Fortress Agent asks for the code shown. '
+          'Only a Console that is unlocked can make a code, so nothing joins Fortress without the password.',
           style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     );
+  }
+
+  Future<void> _enrol(BuildContext context, Device d) async {
+    if (d.enrolled) {
+      final ok = await confirm(
+        context,
+        title: 'Re-enrol ${d.name}?',
+        body:
+            'Use this after the device was reset or its Agent reinstalled. Once the new code is used, '
+            'the Agent that is enrolled now can no longer reach Fortress.',
+        action: 'Make a code',
+      );
+      if (!ok || !context.mounted) return;
+    }
+    Enrolment? e;
+    await act(context, () async => e = await state.startEnrolment(d.id));
+    if (e != null && context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => EnrolmentDialog(device: d, enrolment: e!),
+      );
+    }
   }
 
   Future<void> _add(BuildContext context) async {
@@ -137,6 +168,64 @@ class DevicesScreen extends StatelessWidget {
     if (ok && context.mounted) {
       await act(context, () => state.edit((api) => api.removeDevice(d.id)), done: '${d.name} released.');
     }
+  }
+}
+
+class EnrolmentDialog extends StatelessWidget {
+  const EnrolmentDialog({super.key, required this.device, required this.enrolment});
+
+  final Device device;
+  final Enrolment enrolment;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final e = enrolment;
+    final port = e.port == 47801 ? '' : ':${e.port}';
+    final address = e.addresses.isEmpty
+        ? 'This PC\'s address on the home network (run ipconfig)'
+        : e.addresses.map((a) => '$a$port').join('  or  ');
+    Widget row(String label, String value, {TextStyle? style}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          ),
+          Expanded(child: SelectableText(value, style: style)),
+        ],
+      ),
+    );
+    return AlertDialog(
+      title: Text('Enrol ${device.name}'),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              device.platform == 'windows'
+                  ? 'The Windows Agent comes in a later phase (Spec 01 §11, Phase 7). When it is installed, enter:'
+                  : 'On ${device.name}, open the Fortress Agent app and enter:',
+            ),
+            const SizedBox(height: 12),
+            row('Core address', address),
+            row('Device id', e.deviceId),
+            row('Code', e.code, style: t.headlineSmall?.copyWith(fontFamily: 'monospace', letterSpacing: 2)),
+            const SizedBox(height: 12),
+            Text(
+              'The code works once, until ${clockTime(e.expiresAt)}. After 5 wrong tries it stops working. '
+              'Once enrolled, the device shows Core key ${e.keyId}; it should match this Console\'s.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+      actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))],
+    );
   }
 }
 

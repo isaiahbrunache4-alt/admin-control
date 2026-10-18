@@ -18,6 +18,15 @@ String deviceStatusText(Device d) => switch (d.status) {
   _ => 'Last check-in ${shortDateTime(d.lastSeen!)}',
 };
 
+/// What the device's Agent has: enrolled or not, and whether it has the latest rules.
+String agentText(Device d, int latest) {
+  if (!d.enrolled) return 'Agent not enrolled';
+  final held = d.versionHeld;
+  if (held == null) return 'Agent enrolled · no check-in yet';
+  if (held < latest) return 'Agent has rules v$held of v$latest · gets the rest at its next check-in';
+  return 'Agent up to date (rules v$held${d.agentVersion == null ? '' : ', Agent ${d.agentVersion}'})';
+}
+
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key, required this.state});
 
@@ -53,7 +62,8 @@ class DashboardScreen extends StatelessWidget {
                           color: deviceColor(context, d.status),
                         ),
                         title: Text(d.name),
-                        subtitle: Text(deviceStatusText(d)),
+                        subtitle: Text('${deviceStatusText(d)}\n${agentText(d, s.version)}'),
+                        isThreeLine: true,
                         trailing: Text(
                           d.activeSchedules.isEmpty
                               ? 'No blocks now'

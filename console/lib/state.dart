@@ -102,6 +102,18 @@ class ConsoleState extends ChangeNotifier {
     unawaited(_refreshActivity());
   }
 
+  /// A one-time enrolment code for a device's Agent.
+  Future<Enrolment> startEnrolment(String deviceId) async {
+    try {
+      final e = Enrolment.fromJson(await api.startEnrolment(deviceId));
+      unawaited(_refreshActivity());
+      return e;
+    } on ApiError catch (e) {
+      if (e.isLocked) await refresh();
+      rethrow;
+    }
+  }
+
   Future<void> _refreshActivity() async {
     try {
       activity = [for (final a in await api.activity()) ActivityEntry.fromJson(a as Map<String, dynamic>)];

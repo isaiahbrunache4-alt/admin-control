@@ -137,8 +137,23 @@ class FakeCore {
         'last_seen': null,
         'status': 'never',
         'active_schedules': [],
+        'enrolled': false,
+        'version_held': null,
+        'agent_version': null,
       });
       return _json(done());
+    }
+    final enrol = RegExp(r'^devices/([^/]+)/enrolment$').firstMatch(path);
+    if (enrol != null) {
+      if (!devices.any((d) => d['id'] == enrol[1])) return _err(400, 'invalid', "no device '${enrol[1]}'");
+      return _json({
+        'code': 'ABCDE-FGHJK',
+        'expires_at': '2026-10-19T12:30:00Z',
+        'device_id': enrol[1],
+        'port': 47801,
+        'addresses': ['192.168.1.20'],
+        'key_id': 'abcdef0123456789',
+      });
     }
     if (path == 'schedules' || path == 'block-now') {
       final id = 's${schedules.length + 1}';

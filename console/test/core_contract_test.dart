@@ -47,6 +47,12 @@ void main() {
 
     await api.addDevice('tablet', 'Lenovo Idea Tab', 'android');
     await api.addDevice('pc', 'This PC', 'windows');
+    final enrolment = Enrolment.fromJson(await api.startEnrolment('tablet'));
+    expect(enrolment.code, matches(RegExp(r'^[A-Z2-9]{5}-[A-Z2-9]{5}$')));
+    expect(enrolment.deviceId, 'tablet');
+    expect(enrolment.keyId, status.keyId);
+    expect(enrolment.expiresAt.isAfter(DateTime.now()), isTrue);
+    await expectLater(api.startEnrolment('nobody'), throwsA(isA<ApiError>().having((e) => e.status, 'status', 400)));
     await api.addList('social');
     await api.addItem('social', 'domains', 'TikTok.com');
     await api.addItem('social', 'domains', '*.reddit.com');
