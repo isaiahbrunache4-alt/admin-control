@@ -1,7 +1,9 @@
 # Fortress — Software Design (Spec 01, draft)
 
-**Status: draft, for review. Phase 1 (Core, `core/`) and Phase 2 (Console,
-`console/`) are implemented; the Agents are not.** Written 2026-10-16;
+**Status: draft, for review. Phases 1–2 (Core `core/`, Console `console/`) are
+implemented. Phase 3 (Android Agent, `android/`) is built and tested off-device; the
+on-device check is still to do.** Agent protocol: `docs/agent_protocol.md` (approved
+2026-10-18). Written 2026-10-16;
 **revised 2026-10-16** to add the PC-layer lock and the "any device" model (§3, §7.2,
 §8, §9); build order changed to PC lock last, and Windows Home noted (§11, §13).
 Items that are assumptions rather than stated requirements are marked **assumed**.
@@ -140,9 +142,11 @@ Matches the stack already in use on ExVelo (Python, Flutter, Kotlin, Android).
 | **Android Agent** | Pixel 8a, Idea Tab | Kotlin | Blocking needs native Android APIs |
 
 Main libraries: `cryptography` (Ed25519 signatures), `argon2-cffi` (password hashing),
-`fastapi` (sync API), `zeroconf` (find devices on home Wi-Fi), SQLite. Android:
-`VpnService` (website filter), Android's management APIs (app suspension),
-WorkManager (scheduled sync).
+`fastapi` (Console API on localhost, Agent API on the home network, port 47801), SQLite.
+Android: Android's management APIs (app suspension), the Keystore (device key),
+AlarmManager (schedule boundaries and 15-minute check-ins), and later `VpnService`
+(website filter). In v1 the Agent is given Core's address at enrolment; finding it
+automatically on the Wi-Fi (`zeroconf`) is left for later.
 
 ---
 
@@ -348,7 +352,8 @@ until the system is proven.
 | USB debugging and terminals | Always / only while unlocked | Always (ExVelo work), logged |
 | Separate block lists for the PC, or shared lists? | Shared / per device | Shared lists, per-device schedules |
 | Auto-relock time, amber/red thresholds | 15 min, 24 h, 72 h | Confirm |
-| Lenovo Idea Tab exact model and Android version | — | Needed before Phase 3 |
+| Lenovo Idea Tab exact model and Android version | — | **Android 16** (2026-10-18). Exact model still to note |
+| How Agents prove who they are | — | **Decided 2026-10-18:** one-time enrolment code proved by HMAC on both sides, then every request signed by the device's own P-256 key (`docs/agent_protocol.md`) |
 | Activate Windows before Phase 7? | Yes / no | Answer before Phase 7 (§13) |
 
 ---

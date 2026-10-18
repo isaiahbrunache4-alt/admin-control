@@ -4,10 +4,20 @@ Self-control software for Isaiah's own devices. A Windows PC is the only control
 the PC itself, a Pixel 8a and a Lenovo Idea Tab enforce website blocks, app blocks and scheduled blocks.
 One password unlocks changes.
 
-**Status: Phases 1–2 built and tested** (Core and the Console). No device Agents yet.
+**Status:** Phases 1–2 (Core, Console) built and tested. Phase 3 (Android Agent, app
+blocking) built and tested off-device; next is trying it on the tablet
+([`android/README.md`](android/README.md)).
 
 - Design: [`docs/fortress_design.md`](docs/fortress_design.md)
 - Rules and bundle format, for Agents: [`docs/rules_format.md`](docs/rules_format.md)
+- How Agents enrol and talk to Core: [`docs/agent_protocol.md`](docs/agent_protocol.md)
+- Cases every Agent must pass, generated from Core: [`testdata/fortress_vectors.json`](testdata/fortress_vectors.json)
+
+| Folder | What |
+|---|---|
+| `core/` | Fortress Core (Python): rules, password, signing, the Console and Agent APIs, the `fortress` command |
+| `console/` | Fortress Console (Flutter, Windows): the main UI |
+| `android/` | Fortress Agent for Android (Kotlin): the phone and the tablet |
 
 ## Core (Phase 1)
 
@@ -64,3 +74,18 @@ flutter test test/core_contract_test.dart
 
 Core does not install itself as a Windows service yet; `fortress serve` runs in the
 foreground until then.
+
+## Agents
+
+`fortress serve` also listens for device Agents on the home network, port **47801**
+(`--no-agents` turns that off). A device joins with a one-time code from
+**Devices → Enrol** in the unlocked Console (or `fortress device enrol ID`). The Android
+Agent, how to build it and how to set up the tablet: [`android/README.md`](android/README.md).
+
+After changing anything that decides blocking or the protocol in `core/`, regenerate the
+shared cases and run every Agent's tests against them:
+
+```
+cd core && python -m tests.make_vectors
+cd android && gradlew :agent-core:test
+```
