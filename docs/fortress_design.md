@@ -1,10 +1,10 @@
 # Fortress — Software Design (Spec 01, draft)
 
-**Status: draft, for review. Phases 1–2 (Core `core/`, Console `console/`) are
-implemented. Phase 3 (Android app blocking) is working on the tablet (2026-10-19).
-Phases 4–6 on Android (website filter, release-build hardening, Pixel) are built and
-tested off-device; the on-device checks are in `android/README.md`.** Agent protocol:
-`docs/agent_protocol.md` (approved 2026-10-18). Written 2026-10-16;
+**Status: draft, for review. All five components exist. Core (`core/`), Console
+(`console/`) and the Android app (`android/`) are built and tested; the Android app
+blocks apps on the tablet. The Windows Agent — the PC-layer lock (`windows/`) — is built
+and tested off-device; its on-device checks and the standard-account switch-over are in
+`windows/README.md`.** Agent protocol: `docs/agent_protocol.md`. Written 2026-10-16;
 **revised 2026-10-16** to add the PC-layer lock and the "any device" model (§3, §7.2,
 §8, §9); build order changed to PC lock last, and Windows Home noted (§11, §13).
 Items that are assumptions rather than stated requirements are marked **assumed**.

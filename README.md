@@ -4,10 +4,10 @@ Self-control software for Isaiah's own devices. A Windows PC is the only control
 the PC itself, a Pixel 8a and a Lenovo Idea Tab enforce website blocks, app blocks and scheduled blocks.
 One password unlocks changes.
 
-**Status:** Core and the Console built and tested. Android: app blocking works on the
-tablet; website blocking and release-build support are built and tested off-device, next
-to try on the tablet ([`android/README.md`](android/README.md)). The PC layer (Windows
-Agent) comes after the tablet and phone.
+**Status:** Core, Console, and the Android and Windows Agents are all built and tested.
+The Android app blocks apps on the tablet; the Windows PC-layer lock is tested off-device
+(next: try it on the PC, then switch daily use to a standard account). What remains is
+on-device bring-up, not new components.
 
 - Design: [`docs/fortress_design.md`](docs/fortress_design.md)
 - Rules and bundle format, for Agents: [`docs/rules_format.md`](docs/rules_format.md)
@@ -19,6 +19,7 @@ Agent) comes after the tablet and phone.
 | `core/` | Fortress Core (Python): rules, password, signing, the Console and Agent APIs, the `fortress` command |
 | `console/` | Fortress Console (Flutter, Windows): the main UI |
 | `android/` | Fortress Agent for Android (Kotlin): the phone and the tablet |
+| `windows/` | Fortress Agent for Windows (Python): the PC-layer lock |
 
 ## Core (Phase 1)
 
@@ -90,13 +91,19 @@ foreground until then.
 
 `fortress serve` also listens for device Agents on the home network, port **47801**
 (`--no-agents` turns that off). A device joins with a one-time code from
-**Devices → Enrol** in the unlocked Console (or `fortress device enrol ID`). The Android
-Agent, how to build it and how to set up the tablet: [`android/README.md`](android/README.md).
+**Devices → Enrol** in the unlocked Console (or `fortress device enrol ID`).
+
+- Android Agent (phone, tablet): [`android/README.md`](android/README.md)
+- Windows Agent (the PC-layer lock): [`windows/README.md`](windows/README.md)
 
 After changing anything that decides blocking or the protocol in `core/`, regenerate the
 shared cases and run every Agent's tests against them:
 
 ```
-cd core && python -m tests.make_vectors
+cd core && python -m tests.make_vectors        # then: pytest
 cd android && gradlew :agent-core:test
+cd windows && pytest
 ```
+
+The Windows Agent reuses `fortress_core`, so install both in one environment
+(`pip install -e core windows`).

@@ -208,7 +208,7 @@ class EnrolmentDialog extends StatelessWidget {
           children: [
             Text(
               device.platform == 'windows'
-                  ? 'The Windows Agent comes in a later phase (Spec 01 §11, Phase 7). When it is installed, enter:'
+                  ? 'On ${device.name}, run in PowerShell:  fortress-agent enrol <address> ${device.id} <code>\nwith:'
                   : 'On ${device.name}, open the Fortress Agent app and enter:',
             ),
             const SizedBox(height: 12),
