@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+*.key
+*.json.tmp
+agent_state.json
