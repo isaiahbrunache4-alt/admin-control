@@ -4,9 +4,10 @@ Self-control software for Isaiah's own devices. A Windows PC is the only control
 the PC itself, a Pixel 8a and a Lenovo Idea Tab enforce website blocks, app blocks and scheduled blocks.
 One password unlocks changes.
 
-**Status:** Phases 1–2 (Core, Console) built and tested. Phase 3 (Android Agent, app
-blocking) built and tested off-device; next is trying it on the tablet
-([`android/README.md`](android/README.md)).
+**Status:** Core and the Console built and tested. Android: app blocking works on the
+tablet; website blocking and release-build support are built and tested off-device, next
+to try on the tablet ([`android/README.md`](android/README.md)). The PC layer (Windows
+Agent) comes after the tablet and phone.
 
 - Design: [`docs/fortress_design.md`](docs/fortress_design.md)
 - Rules and bundle format, for Agents: [`docs/rules_format.md`](docs/rules_format.md)

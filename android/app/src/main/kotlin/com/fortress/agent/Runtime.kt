@@ -38,6 +38,7 @@ object Runtime {
     fun apply(context: Context): Applied {
         val enforcer = Enforcer(context)
         val applied = enforcer.apply(agent(context), Instant.now())
+        refreshFilter(context)
         scheduleApply(context, applied.nextChange)
         scheduleSync(context)
         Log.i(TAG, "applied: owner=${applied.deviceOwner} blocked=${applied.blocked} next=${applied.nextChange}")
@@ -45,8 +46,19 @@ object Runtime {
     }
 
     /** Check in with Core; apply at once if the rules changed (A2, A5). Off the main thread. */
+    /** Give the website filter the rules this device enforces (none once released). */
+    fun refreshFilter(context: Context) {
+        val a = agent(context)
+        val s = a.state
+        val payload = if (s.released) null else a.currentPayload()
+        FilterVpnService.filter.update(payload?.rules, s.deviceId)
+    }
+
     fun sync(context: Context): SyncResult {
-        val result = agent(context).sync(enforcing = Enforcer(context).isDeviceOwner)
+        val agent = agent(context)
+        // Blocked-site counts since the last check-in, per block-list entry.
+        FilterVpnService.filter.takeSummary()?.let { agent.log("sites_blocked", it) }
+        val result = agent.sync(enforcing = Enforcer(context).isDeviceOwner)
         if (result.rulesChanged || result.state.released) apply(context)
         result.error?.let { Log.w(TAG, "sync: $it") }
         return result

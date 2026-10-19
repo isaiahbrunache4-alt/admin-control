@@ -1,6 +1,8 @@
 package com.fortress.agent
 
 import android.app.Activity
+import android.content.Intent
+import android.net.VpnService
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputType
@@ -30,6 +32,7 @@ class MainActivity : Activity() {
     private lateinit var deviceId: EditText
     private lateinit var code: EditText
     private lateinit var message: TextView
+    private lateinit var startFilter: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +68,14 @@ class MainActivity : Activity() {
         })
         column.addView(enrolForm)
 
+        // Normally Android starts the filter itself (always-on VPN). If this device asks
+        // for the one-time VPN approval instead, this gives it.
+        startFilter = Button(this).apply {
+            text = "Start website filter"
+            visibility = View.GONE
+            setOnClickListener { startWebsiteFilter() }
+        }
+        column.addView(startFilter)
         column.addView(Button(this).apply {
             text = "Check in now"
             setOnClickListener { syncNow() }
@@ -114,6 +125,10 @@ class MainActivity : Activity() {
                         },
                     )
                     appendLine(if (applied.blocked.isEmpty()) "No apps blocked." else "Apps blocked: " + applied.blocked.sorted().joinToString())
+                    appendLine(
+                        if (FilterVpnService.running) "Website filter: on"
+                        else "Website filter: off (Android starts it as the always-on VPN)",
+                    )
                     applied.nextChange?.let { appendLine("Next change: ${local(it)}") }
                     appendLine()
                     appendLine("Last check-in: ${s.lastSync?.let { local(Instant.parse(it)) } ?: "never"}")
@@ -123,6 +138,8 @@ class MainActivity : Activity() {
             runOnUiThread {
                 status.text = text
                 enrolForm.visibility = if (s.enrolled) View.GONE else View.VISIBLE
+                startFilter.visibility =
+                    if (applied.deviceOwner && s.enrolled && !s.released && !FilterVpnService.running) View.VISIBLE else View.GONE
             }
         }
     }
@@ -163,6 +180,28 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun startWebsiteFilter() {
+        val consent = VpnService.prepare(this)
+        if (consent != null) {
+            @Suppress("DEPRECATION")
+            startActivityForResult(consent, REQUEST_VPN)
+        } else {
+            onVpnApproved()
+        }
+    }
+
+    @Deprecated("Activity result API needs AndroidX; this app has no dependencies")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_VPN && resultCode == RESULT_OK) onVpnApproved()
+    }
+
+    private fun onVpnApproved() {
+        startService(Intent(this, FilterVpnService::class.java))
+        message.postDelayed({ refresh() }, 1500)
+    }
+
     private fun say(text: String) {
         message.text = text
     }
@@ -170,6 +209,7 @@ class MainActivity : Activity() {
     private fun local(t: Instant): String = FORMAT.format(t.atZone(ZoneId.systemDefault()))
 
     private companion object {
+        const val REQUEST_VPN = 1
         val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM HH:mm")
     }
 }

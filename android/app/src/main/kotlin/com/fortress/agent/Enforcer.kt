@@ -3,7 +3,9 @@ package com.fortress.agent
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import android.os.UserManager
+import android.util.Log
 import com.fortress.agent.core.Agent
 import com.fortress.agent.core.Evaluator
 import java.time.Instant
@@ -46,6 +48,7 @@ class Enforcer(private val context: Context) {
             return Applied(true, emptySet(), emptySet(), emptyList(), null)
         }
         hardenClock()
+        keepFilterOn()
 
         val deviceId = state.deviceId
         val want = if (payload != null && deviceId != null) {
@@ -80,6 +83,33 @@ class Enforcer(private val context: Context) {
         dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
     }
 
+    /**
+     * The website filter (Spec 01 §8.1): Fortress is the always-on VPN, so Android starts
+     * it at boot and restarts it, and VPN settings cannot be changed on the device.
+     * Ways around a DNS filter are closed: Private DNS stays on "automatic" (strict mode
+     * would send lookups past it), and Chrome's own secure DNS is turned off.
+     */
+    private fun keepFilterOn() {
+        if (dpm.getAlwaysOnVpnPackage(admin) != context.packageName) {
+            try {
+                // Not lockdown: if the filter ever fails, the network keeps working
+                // unfiltered rather than not at all. Android restarts it either way.
+                dpm.setAlwaysOnVpnPackage(admin, context.packageName, false)
+            } catch (e: Exception) {
+                Log.w(TAG, "always-on VPN", e)
+            }
+        }
+        dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_VPN)
+        dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_PRIVATE_DNS)
+        if (dpm.getGlobalPrivateDnsMode(admin) != DevicePolicyManager.PRIVATE_DNS_MODE_OPPORTUNISTIC) {
+            dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+        }
+        val current = dpm.getApplicationRestrictions(admin, CHROME)
+        if (current.getString(CHROME_DOH_POLICY) != "off") {
+            dpm.setApplicationRestrictions(admin, CHROME, Bundle().apply { putString(CHROME_DOH_POLICY, "off") })
+        }
+    }
+
     /** A signed release names this device (contract A6): lift everything and step down. */
     @Suppress("DEPRECATION")
     private fun standDown(agent: Agent) {
@@ -87,12 +117,25 @@ class Enforcer(private val context: Context) {
         if (had.isNotEmpty()) dpm.setPackagesSuspended(admin, had.toTypedArray(), false)
         prefs.edit().remove(KEY_SUSPENDED).apply()
         dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_DATE_TIME)
-        agent.log("released", "lifted ${had.size} app blocks; no longer device owner")
+        // The website filter and what kept it on.
+        try {
+            dpm.setAlwaysOnVpnPackage(admin, null, false)
+        } catch (e: Exception) {
+            Log.w(TAG, "clear always-on VPN", e)
+        }
+        FilterVpnService.stop(context)
+        dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_VPN)
+        dpm.clearUserRestriction(admin, UserManager.DISALLOW_CONFIG_PRIVATE_DNS)
+        dpm.setApplicationRestrictions(admin, CHROME, Bundle())
+        agent.log("released", "lifted ${had.size} app blocks and the website filter; no longer device owner")
         // Deprecated for third parties, but still how a device owner removes itself.
         dpm.clearDeviceOwnerApp(context.packageName)
     }
 
     private companion object {
+        const val TAG = "Fortress"
         const val KEY_SUSPENDED = "suspended"
+        const val CHROME = "com.android.chrome"
+        const val CHROME_DOH_POLICY = "DnsOverHttpsMode"
     }
 }

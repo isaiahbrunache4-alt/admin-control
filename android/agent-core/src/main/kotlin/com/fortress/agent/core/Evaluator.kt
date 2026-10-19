@@ -58,9 +58,13 @@ object Evaluator {
     }
 
     /** The always-allowed list wins over every block (Spec 01 §8.3, §10). */
-    fun isDomainBlocked(rules: Rules, deviceId: String, host: String, now: Instant): Boolean {
-        if (rules.allow.domains.any { domainMatches(host, it) }) return false
-        return activeBlocks(rules, deviceId, now).domains.any { domainMatches(host, it) }
+    fun isDomainBlocked(rules: Rules, deviceId: String, host: String, now: Instant): Boolean =
+        blockingEntry(rules, activeBlocks(rules, deviceId, now), host) != null
+
+    /** The block-list entry that blocks [host] given [active], or null if it is allowed. */
+    fun blockingEntry(rules: Rules, active: ActiveBlocks, host: String): String? {
+        if (rules.allow.domains.any { domainMatches(host, it) }) return null
+        return active.domains.sorted().firstOrNull { domainMatches(host, it) }
     }
 
     fun isAppBlocked(rules: Rules, deviceId: String, kind: Kind, name: String, now: Instant): Boolean {
