@@ -62,3 +62,28 @@ def test_once_schedule_must_end_after_start():
         rules.validate_schedule(s, r)
     with pytest.raises(RuleError):
         rules.validate_schedule({**s, "end": "2026-10-19T13:00:00"}, r)   # no zone
+
+
+def _rules_with_list():
+    r = rules.empty_rules()
+    r["lists"]["social"] = {k: [] for k in rules.ITEM_KINDS}
+    return r
+
+
+@pytest.mark.parametrize("change", [
+    {"from": None}, {"to": 900}, {"tz": None}, {"tz": ["UTC"]}, {"days": "mon"},
+    {"devices": [1]}, {"devices": [None]}, {"devices": [""]}, {"list": ["social"]}, {"id": 7},
+])
+def test_wrong_types_are_rule_errors(change):
+    """Anything from JSON must be refused as a RuleError, never crash with TypeError."""
+    s = {"id": "s1", "list": "social", "devices": ["all"], "kind": "weekly",
+         "days": ["mon"], "from": "09:00", "to": "10:00", "tz": "UTC", **change}
+    with pytest.raises(RuleError):
+        rules.validate_schedule(s, _rules_with_list())
+
+
+@pytest.mark.parametrize("start,end", [(5, "2026-01-01T00:00:00Z"), ("2026-01-01T00:00:00Z", None)])
+def test_one_off_with_wrong_types(start, end):
+    s = {"list": "social", "devices": ["all"], "kind": "once", "start": start, "end": end}
+    with pytest.raises(RuleError):
+        rules.validate_schedule(s, _rules_with_list())

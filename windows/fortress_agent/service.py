@@ -29,7 +29,9 @@ class Platform:
     def terminate(self, pid: int) -> bool:
         return terminate(pid)
     def upstreams(self) -> list[str]:
-        return DEFAULT_UPSTREAMS
+        """The network's own DNS servers, as seen before pointing the adapters at the
+        filter; empty if not known."""
+        return []
 
 
 class WindowsPlatform(Platform):  # pragma: no cover - Windows only
@@ -43,7 +45,7 @@ class WindowsPlatform(Platform):  # pragma: no cover - Windows only
         self._w.set_browser_dns_policy(enabled)
 
     def upstreams(self) -> list[str]:
-        return self._saved_upstreams or DEFAULT_UPSTREAMS
+        return list(self._saved_upstreams)
 
     def point_dns_at_filter(self) -> list[str]:
         self._adapters = self._w.list_adapters()
@@ -100,16 +102,29 @@ class AgentService:
     def _ensure_filter(self, payload, device_id) -> None:
         check = make_domain_check(payload, device_id, clock=self.clock)
         if self.filter is None:
-            self.filter = DnsFilter(check, self.platform.upstreams(), port=self.dns_port)
+            self.filter = DnsFilter(check, self._upstreams(), port=self.dns_port)
             try:
                 self.filter.start()
                 self._adapters = self.platform.point_dns_at_filter()
-                self.agent.log("filter_started")
+                # Only now has the platform read the network's own DNS servers.
+                self.filter.upstreams = self._upstreams()
+                self.agent.log("filter_started", "forwarding to " + ", ".join(self.filter.upstreams))
             except OSError as e:
                 self.agent.log("filter_error", str(e))
                 self.filter = None
         else:
             self.filter.is_blocked = check
+
+    def _upstreams(self) -> list[str]:
+        """Where allowed lookups go. Once the adapters point at 127.0.0.1 (which survives a
+        reboot) Windows no longer shows the network's DNS servers, so remember them."""
+        found = self.platform.upstreams()
+        if found:
+            if found != self.agent.state.upstreams:
+                self.agent.state.set(upstreams=found)
+                self.agent.state.save()
+            return found
+        return self.agent.state.upstreams or DEFAULT_UPSTREAMS
 
     def _enforce_programs(self, payload, device_id) -> int:
         want = programs_to_block(payload, device_id, self.clock())

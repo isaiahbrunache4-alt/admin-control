@@ -33,3 +33,9 @@ def test_recovery_code_format_and_normalisation():
     assert len(groups) == 6 and all(len(g) == 4 for g in groups)
     assert not set(code) & set("01ILO")
     assert crypto.normalize_recovery_code(code.lower().replace("-", " ")) == code.replace("-", "")
+
+
+def test_unseal_refuses_unknown_kdf():
+    sealed = dict(crypto.seal(b"x", "pw-123456"), kdf="scrypt")
+    with pytest.raises(ValueError):
+        crypto.unseal(sealed, "pw-123456")

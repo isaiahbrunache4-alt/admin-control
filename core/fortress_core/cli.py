@@ -17,6 +17,7 @@ from . import bundle, crypto, rules
 from .core import Fortress, FortressError
 from .rules import RuleError
 from .schedule import is_app_blocked, is_domain_blocked
+from .store import NewerSchema
 
 KIND_ALIASES = {
     "domain": "domains", "site": "domains",
@@ -362,6 +363,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"fortress: cannot open the database at {path} ({e}).\n"
               "Choose another place with --db PATH or the FORTRESS_DB environment variable.",
               file=sys.stderr)
+        return 2
+    except NewerSchema as e:
+        print(f"fortress: {e}", file=sys.stderr)
         return 2
     try:
         if args.command not in ("init", "serve") and not f.is_set_up:

@@ -77,18 +77,34 @@ With a block scheduled for `pc` and the agent running:
 Until now the agent runs by hand from the administrator account. The lock only holds once
 it runs on its own and daily use moves to a standard account that cannot stop it.
 
-1. **Run the agent as a service (SYSTEM), auto-starting.** Create it with the built-in
-   `sc.exe`, in an administrator PowerShell (one line):
+1. **Run the agent as SYSTEM at every start-up, restarted if it stops.** Use Task
+   Scheduler, not `sc.exe create`: `fortress-agent run` is an ordinary program, and a
+   Windows *service* has to answer the Service Control Manager, so `sc.exe` would start it
+   and then kill it after about 30 seconds (error 1053). In an administrator PowerShell,
+   with the path to *your* venv:
 
    ```powershell
-   sc.exe create FortressAgent binPath= "\"C:\path\to\windows\.venv\Scripts\fortress-agent.exe\" run" start= auto obj= LocalSystem DisplayName= "Fortress PC Lock"
-   sc.exe description FortressAgent "Fortress PC-layer lock"
-   sc.exe start FortressAgent
+   $exe = "C:\path\to\windows\.venv\Scripts\fortress-agent.exe"
+   $action   = New-ScheduledTaskAction -Execute $exe -Argument "run"
+   $atBoot   = New-ScheduledTaskTrigger -AtStartup
+   $every5   = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+   $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
+       -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew `
+       -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+   Register-ScheduledTask -TaskName "Fortress PC Lock" -Action $action -Trigger $atBoot,$every5 `
+       -Settings $settings -User "SYSTEM" -RunLevel Highest
+   Start-ScheduledTask -TaskName "Fortress PC Lock"
    ```
 
-   A SYSTEM service keeps running across logins and cannot be stopped from a standard
-   account. (`fortress-agent.exe run` loops in the foreground, which is what a service
-   expects; a crash is restarted by `sc.exe failure` settings if you add them.)
+   `ExecutionTimeLimit 0` stops Windows ending it after its default 3 days; the 5-minute
+   trigger starts it again if it ever exits (a second copy is never started while one
+   runs). A task that runs as SYSTEM cannot be ended from a standard account. Check with
+   `Get-ScheduledTask "Fortress PC Lock" | Get-ScheduledTaskInfo` (LastTaskResult `267009`
+   means "running").
+
+   The venv must live where the daily account **cannot write** (for example in the
+   administrator's home folder, or under `C:\Program Files`). Otherwise editing a `.py`
+   file in it would switch the lock off.
 
 2. **Make a standard (non-administrator) Windows account for daily use**, and use it from
    now on. Settings → Accounts → Other users → Add account → change its type to Standard.

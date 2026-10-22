@@ -9,7 +9,7 @@ tests on any OS.
 
 from datetime import datetime, timezone
 
-from fortress_core.schedule import active_blocks, is_domain_blocked
+from fortress_core.schedule import active_blocks, domain_matches
 
 # Fortress never blocks the tools needed to unlock or recover (Spec 01 §9, §10), nor the
 # programs that would stop blocking from working. These are always allowed on the PC on
@@ -34,20 +34,21 @@ def programs_to_block(payload: dict | None, device_id: str, now: datetime | None
 
 
 def make_domain_check(payload: dict | None, device_id: str, clock=_now):
-    """A fast is_blocked(host) for the DNS filter, re-reading the schedule each minute."""
-    cache: dict[str, object] = {"minute": None, "active": None}
+    """A fast is_blocked(host) for the DNS filter, re-reading the schedule each minute.
+    Same answers as fortress_core.schedule.is_domain_blocked: the allow-list wins."""
+    cache: dict[str, object] = {"minute": None, "domains": ()}
 
     def is_blocked(host: str) -> bool:
         if payload is None:
             return False
+        if any(domain_matches(host, p) for p in payload["rules"]["allow"]["domains"]):
+            return False
         now = clock()
         minute = int(now.timestamp()) // 60
         if cache["minute"] != minute:
-            cache["active"] = active_blocks(payload["rules"], device_id, now)
+            cache["domains"] = tuple(active_blocks(payload["rules"], device_id, now).domains)
             cache["minute"] = minute
-        # is_domain_blocked honours the allow-list; evaluate against the cached window by
-        # reusing the published matching rules directly.
-        return is_domain_blocked(payload["rules"], device_id, host, now)
+        return any(domain_matches(host, p) for p in cache["domains"])
 
     return is_blocked
 

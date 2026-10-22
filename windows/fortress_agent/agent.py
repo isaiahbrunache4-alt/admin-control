@@ -57,6 +57,7 @@ class AgentState:
     released = property(lambda s: s._d.get("released", False))
     last_sync = property(lambda s: s._d.get("last_sync"))
     last_error = property(lambda s: s._d.get("last_error"))
+    upstreams = property(lambda s: list(s._d.get("upstreams") or []))
 
     @property
     def events(self) -> list[dict]:

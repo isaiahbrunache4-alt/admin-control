@@ -119,3 +119,61 @@ def _nxdomain(port: int, name: str) -> bool:
         c.sendto(msg, ("127.0.0.1", port))
         reply = c.recv(4096)
     return struct.unpack_from("!H", reply, 2)[0] & 0xF == 3
+
+
+class RouterDnsPlatform(StubPlatform):
+    """Like Windows: the network's DNS servers are only read while pointing the adapters
+    at the filter, and after a reboot the adapters already say 127.0.0.1."""
+
+    def __init__(self, network_dns):
+        super().__init__()
+        self.network_dns = network_dns
+        self.seen: list[str] = []
+
+    def point_dns_at_filter(self):
+        self.seen = list(self.network_dns)
+        return super().point_dns_at_filter()
+
+    def upstreams(self):
+        return self.seen
+
+
+def test_filter_forwards_to_the_networks_own_dns(tmp_path):
+    from fortress_agent.service import DEFAULT_UPSTREAMS
+
+    agent, svc = make(tmp_path, clock=lambda: NOON)
+    svc.platform = RouterDnsPlatform(["192.168.1.1"])
+    try:
+        svc.apply()
+        assert svc.filter.upstreams == ["192.168.1.1"]
+    finally:
+        svc.stop()
+
+    # After a reboot Windows shows only 127.0.0.1; the remembered servers are used.
+    agent2 = Agent(AgentState(tmp_path / "pc.json"), agent.signer, clock=lambda: NOON)
+    svc2 = AgentService(agent2, RouterDnsPlatform([]), clock=lambda: NOON, dns_port=0)
+    try:
+        svc2.apply()
+        assert svc2.filter.upstreams == ["192.168.1.1"]
+        assert svc2.filter.upstreams != DEFAULT_UPSTREAMS
+    finally:
+        svc2.stop()
+
+
+def test_domain_check_matches_core_and_follows_the_clock():
+    from fortress_agent.enforce import make_domain_check
+    from fortress_core.schedule import is_domain_blocked
+
+    rules = {
+        "lists": {"social": {"domains": ["tiktok.com", "*.reddit.com"], "android_packages": [], "windows_programs": []}},
+        "schedules": [{"id": "s1", "list": "social", "devices": ["pc"], "kind": "once",
+                       "start": "2026-10-19T12:00:00Z", "end": "2026-10-19T13:00:00Z"}],
+        "allow": {"domains": ["docs.reddit.com"], "android_packages": [], "windows_programs": []},
+    }
+    now = {"t": NOON}
+    check = make_domain_check({"rules": rules}, "pc", clock=lambda: now["t"])
+    hosts = ["tiktok.com", "www.tiktok.com", "reddit.com", "docs.reddit.com", "github.com"]
+    for t in (NOON, NOON.replace(hour=13, minute=1)):
+        now["t"] = t
+        for h in hosts:
+            assert check(h) == is_domain_blocked(rules, "pc", h, t), (h, t)

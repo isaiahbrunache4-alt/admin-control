@@ -52,6 +52,10 @@ _DEVICE_COLUMNS = {
 }
 
 
+class NewerSchema(Exception):
+    """The database was written by a newer Fortress Core than this one."""
+
+
 class Store:
     def __init__(self, path: str | Path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -59,6 +63,14 @@ class Store:
         self.db = sqlite3.connect(str(path), check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(_SCHEMA)
+        found = self.get("schema_version", 0)
+        if found > SCHEMA_VERSION:
+            # Written by a newer Core. Opening it would mark it older and risk losing data.
+            self.db.close()
+            raise NewerSchema(
+                f"{path} was made by a newer Fortress Core (schema {found}, this is "
+                f"{SCHEMA_VERSION}); update Fortress Core before opening it"
+            )
         have = {r["name"] for r in self.db.execute("PRAGMA table_info(devices)")}
         with self.db:
             for col, kind in _DEVICE_COLUMNS.items():

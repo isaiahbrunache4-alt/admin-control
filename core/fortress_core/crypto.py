@@ -47,13 +47,13 @@ def b64d(text: str) -> bytes:
     return base64.b64decode(text.encode("ascii"), validate=True)
 
 
-def derive_key(secret: str, salt: bytes) -> bytes:
+def derive_key(secret: str, salt: bytes, time_cost: int, memory_kib: int, parallelism: int) -> bytes:
     return hash_secret_raw(
         secret.encode("utf-8"),
         salt,
-        time_cost=ARGON2_TIME_COST,
-        memory_cost=ARGON2_MEMORY_KIB,
-        parallelism=ARGON2_PARALLELISM,
+        time_cost=time_cost,
+        memory_cost=memory_kib,
+        parallelism=parallelism,
         hash_len=32,
         type=Type.ID,
     )
@@ -62,12 +62,13 @@ def derive_key(secret: str, salt: bytes) -> bytes:
 def seal(data: bytes, secret: str) -> dict:
     salt = os.urandom(16)
     nonce = os.urandom(12)
-    ct = AESGCM(derive_key(secret, salt)).encrypt(nonce, data, b"fortress-seal-v1")
+    t, m, p = ARGON2_TIME_COST, ARGON2_MEMORY_KIB, ARGON2_PARALLELISM
+    ct = AESGCM(derive_key(secret, salt, t, m, p)).encrypt(nonce, data, b"fortress-seal-v1")
     return {
         "kdf": "argon2id",
-        "t": ARGON2_TIME_COST,
-        "m": ARGON2_MEMORY_KIB,
-        "p": ARGON2_PARALLELISM,
+        "t": t,
+        "m": m,
+        "p": p,
         "salt": b64e(salt),
         "nonce": b64e(nonce),
         "ct": b64e(ct),
@@ -75,15 +76,9 @@ def seal(data: bytes, secret: str) -> dict:
 
 
 def unseal(sealed: dict, secret: str) -> bytes:
-    key = hash_secret_raw(
-        secret.encode("utf-8"),
-        b64d(sealed["salt"]),
-        time_cost=sealed["t"],
-        memory_cost=sealed["m"],
-        parallelism=sealed["p"],
-        hash_len=32,
-        type=Type.ID,
-    )
+    if sealed.get("kdf") != "argon2id":
+        raise ValueError(f"unknown key derivation {sealed.get('kdf')!r}")
+    key = derive_key(secret, b64d(sealed["salt"]), sealed["t"], sealed["m"], sealed["p"])
     try:
         return AESGCM(key).decrypt(b64d(sealed["nonce"]), b64d(sealed["ct"]), b"fortress-seal-v1")
     except InvalidTag:

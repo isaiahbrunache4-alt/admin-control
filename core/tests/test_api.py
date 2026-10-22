@@ -158,6 +158,13 @@ def test_lock_until_and_recover(client, fortress, clock):
     unlock(client, "fresh password")
 
 
+def test_wrong_recovery_code_keeps_the_unlock(client):
+    h = unlock(client)
+    r = client.post(API + "/recover", json={"code": "AAAA-AAAA-AAAA-AAAA-AAAA-AAAA", "new_password": "fresh password"})
+    assert r.status_code == 401
+    assert client.post(API + "/lists", json={"name": "still-unlocked"}, headers=h).status_code == 200
+
+
 def test_change_password_through_api(client):
     h = unlock(client)
     r = client.post(API + "/password", json={"current": PASSWORD, "new": "another password"}, headers=h)

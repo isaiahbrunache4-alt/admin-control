@@ -253,6 +253,19 @@ def test_old_database_is_migrated(tmp_path, clock):
     s.close()
 
 
+def test_database_from_a_newer_core_is_refused(tmp_path):
+    from fortress_core.store import SCHEMA_VERSION, NewerSchema, Store
+    s = Store(tmp_path / "x.db")
+    s.set("schema_version", SCHEMA_VERSION + 1)
+    s.close()
+    with pytest.raises(NewerSchema):
+        Store(tmp_path / "x.db")
+    import sqlite3  # the refusal must not have rewritten the marker
+    db = sqlite3.connect(tmp_path / "x.db")
+    assert db.execute("SELECT value FROM settings WHERE key='schema_version'").fetchone()[0] == str(SCHEMA_VERSION + 1)
+    db.close()
+
+
 def test_lan_addresses_never_loopback():
     assert all(not a.startswith("127.") for a in agents.lan_addresses())
 

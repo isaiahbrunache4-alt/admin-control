@@ -217,9 +217,11 @@ def create_app(fortress: Fortress, guard: threading.Lock | None = None,
 
     @app.post(API + "/recover")
     def recover(body: Recover, f: Fortress = reader):
+        # Check the code first: a wrong code from any program on the PC must not end the
+        # Console's unlock. A right one resets the password, so the unlock ends with it.
+        f.recover(body.code, body.new_password)
         f.lock()
         session["token"] = None
-        f.recover(body.code, body.new_password)
         return status_of(f)
 
     # -- editing (needs the session token)

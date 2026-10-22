@@ -77,25 +77,41 @@ def validate_list_name(name: str) -> str:
     return name
 
 
+def _text(s: dict, key: str) -> str:
+    """A schedule field that must be a string. JSON from the Console or a hand-edited
+    bundle can hold anything, and every refusal here must be a RuleError."""
+    v = s.get(key, "")
+    if not isinstance(v, str):
+        raise RuleError(f"'{key}' must be text, not {type(v).__name__}")
+    return v
+
+
 def validate_schedule(s: dict, rules: dict) -> None:
-    if s.get("list") not in rules["lists"]:
+    """Every Agent evaluates schedules with no error handling to fall back on, so anything
+    that could make schedule.py raise is refused here, before it is ever signed."""
+    if not isinstance(s.get("id", ""), str):
+        raise RuleError("schedule id must be text")
+    if _text(s, "list") not in rules["lists"]:
         raise RuleError(f"schedule names an unknown list: {s.get('list')!r}")
     devices = s.get("devices")
     if not isinstance(devices, list) or not devices:
         raise RuleError("schedule needs at least one device, or 'all'")
+    if not all(isinstance(d, str) and d for d in devices):
+        raise RuleError("device ids must be text")
     kind = s.get("kind")
     if kind == "weekly":
-        if not s.get("days") or any(d not in DAYS for d in s["days"]):
+        days = s.get("days")
+        if not isinstance(days, list) or not days or any(d not in DAYS for d in days):
             raise RuleError(f"days must be from {', '.join(DAYS)}")
         for f in ("from", "to"):
-            if not _HHMM.match(s.get(f, "")):
+            if not _HHMM.match(_text(s, f)):
                 raise RuleError(f"'{f}' must be HH:MM, 24-hour")
         try:
-            ZoneInfo(s.get("tz", ""))
+            ZoneInfo(_text(s, "tz"))
         except (ZoneInfoNotFoundError, ValueError):
             raise RuleError(f"unknown time zone: {s.get('tz')!r}") from None
     elif kind == "once":
-        start, end = parse_utc(s.get("start", "")), parse_utc(s.get("end", ""))
+        start, end = parse_utc(_text(s, "start")), parse_utc(_text(s, "end"))
         if end <= start:
             raise RuleError("a one-off block must end after it starts")
     else:

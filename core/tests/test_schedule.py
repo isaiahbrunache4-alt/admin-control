@@ -123,3 +123,10 @@ def test_blocking_and_always_allowed_wins():
     assert is_app_blocked(r, "tablet", "android_packages", "com.zhiliaoapp.musically", monday)
     assert not is_app_blocked(r, "tablet", "android_packages", "com.shotput.app", monday)
     assert is_app_blocked(r, "tablet", "windows_programs", "Steam.exe", monday)
+
+
+def test_time_without_zone_is_refused():
+    """A naive time would silently use the machine's zone for weekly blocks."""
+    s = weekly(["mon"], "09:00", "10:00")
+    with pytest.raises(ValueError):
+        schedule_active(s, datetime(2026, 10, 19, 9, 30))

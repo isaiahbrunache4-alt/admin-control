@@ -26,6 +26,10 @@ def _minutes(hhmm: str) -> int:
 
 
 def schedule_active(s: dict, now: datetime) -> bool:
+    if now.tzinfo is None:
+        # A naive time would be read as the machine's local time for weekly blocks and
+        # fail to compare for one-off blocks. Always pass an aware time (UTC is simplest).
+        raise ValueError("schedule checks need a time with a time zone")
     if s["kind"] == "once":
         return parse_utc(s["start"]) <= now < parse_utc(s["end"])
 
