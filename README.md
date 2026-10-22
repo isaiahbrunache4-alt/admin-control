@@ -9,6 +9,8 @@ The Android app blocks apps on the tablet; the Windows PC-layer lock is tested o
 (next: try it on the PC, then switch daily use to a standard account). What remains is
 on-device bring-up, not new components.
 
+- **Setting it up, start to finish (plain language):** [`docs/setup_guide.md`](docs/setup_guide.md)
+- Known weak points and feature ideas: [`docs/risks_and_ideas.md`](docs/risks_and_ideas.md)
 - Design: [`docs/fortress_design.md`](docs/fortress_design.md)
 - Rules and bundle format, for Agents: [`docs/rules_format.md`](docs/rules_format.md)
 - How Agents enrol and talk to Core: [`docs/agent_protocol.md`](docs/agent_protocol.md)
