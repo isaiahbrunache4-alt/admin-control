@@ -22,8 +22,8 @@ android {
         applicationId = "com.fortress.agent"
         minSdk = 33            // Android 13+; the Pixel 8a and the Idea Tab run Android 16
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     signingConfigs {
