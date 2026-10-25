@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
@@ -93,7 +94,13 @@ class CoreClient(
 
     fun fetchBundle(): JsonObject = call("GET", Protocol.BUNDLE_PATH, ByteArray(0), signed = true)
 
-    fun checkIn(version: Long, agentVersion: String, enforcing: Boolean, events: List<Event>): CheckInAnswer {
+    fun checkIn(
+        version: Long,
+        agentVersion: String,
+        enforcing: Boolean,
+        events: List<Event>,
+        reports: Map<String, Report> = emptyMap(),
+    ): CheckInAnswer {
         val body = buildJsonObject {
             put("version", version)
             put("agent_version", agentVersion)
@@ -101,6 +108,12 @@ class CoreClient(
             putJsonArray("events") {
                 for (e in events) addJsonObject {
                     put("at", e.at); put("kind", e.kind); put("detail", e.detail)
+                }
+            }
+            if (reports.isNotEmpty()) putJsonObject("reports") {
+                for ((source, r) in reports) putJsonObject(source) {
+                    put("at", r.at)
+                    put("data", Json.parseToJsonElement(r.data))
                 }
             }
         }

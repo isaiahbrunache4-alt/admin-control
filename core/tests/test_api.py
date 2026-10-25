@@ -24,6 +24,20 @@ def unlock(client, password=PASSWORD):
     return {"Authorization": "Bearer " + r.json()["token"]}
 
 
+def test_reports_need_no_unlock_and_skip_removed_devices(fortress, client):
+    fortress.unlock(PASSWORD)
+    fortress.add_device("pixel", "Pixel", "android")
+    fortress.add_device("old", "Old phone", "android")
+    fortress.lock()
+    report = {"at": "2026-10-19T11:58:00Z", "data": {"v": 1}}
+    fortress.store.put_report("pixel", "block_trainer", "2026-10-19T12:00:00Z", report)
+    fortress.store.put_report("old", "block_trainer", "2026-10-19T12:00:00Z", report)
+    fortress.store.release_device("old")
+    r = client.get(API + "/reports")
+    assert r.status_code == 200
+    assert r.json() == {"pixel": {"block_trainer": {"received_at": "2026-10-19T12:00:00Z", "report": report}}}
+
+
 def test_reading_needs_no_unlock(client):
     s = client.get(API + "/status").json()
     assert s["set_up"] and s["state"] == "locked" and s["version"] == 1

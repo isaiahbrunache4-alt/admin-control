@@ -1,0 +1,15 @@
+{
+  "username": "YOUR-BEEMINDER-USERNAME",
+  "goal": "fortress",
+  "auth_token": "PASTE-YOUR-TOKEN-HERE",
+  "devices": ["tablet", "pixel", "pc"],
+  "max_hours": 24,
+  "deliveries": {
+    "ledger": "C:\\Users\\isaia\\AppData\\Local\\PocketLedger",
+    "max_per_week": 1,
+    "max_sync_age_hours": 48,
+    "merchants": ["DoorDash", "Uber Eats", "Grubhub", "Instacart", "Postmates", "Caviar", "Seamless", "Gopuff", "Shipt"]
+  },
+  "workouts": { "source": "block_trainer", "start": "2026-10-26" },
+  "weight": { "source": "block_trainer", "start": "2026-10-26" }
+}

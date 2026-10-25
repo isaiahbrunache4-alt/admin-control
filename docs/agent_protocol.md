@@ -99,6 +99,14 @@ The latest signed envelope. The Agent applies `rules_format.md` §1 to it as usu
  "events": [{"at": "2026-10-19T12:00:00Z", "kind": "bundle_accepted", "detail": "version 7"}]}
 ```
 
+Optional `reports` (Agent 0.4.0): up to 8 sources, each `{"at": "<when the app sent it>",
+"data": {...}}` and at most 32 KB as compact JSON, e.g.
+`"reports": {"block_trainer": {"at": "2026-10-25T18:00:00Z", "data": {"v": 1, ...}}}`. They
+are summaries other apps on the device hand to the Agent (Block Trainer's logged workouts and
+bodyweight). Core keeps the newest per device and source and serves them read-only at
+`GET /api/v1/reports` on the Console API, for the PC's Beeminder check. Core never acts on
+them, and a report can't change what a device blocks.
+
 `version` is the highest bundle the Agent holds. At most 200 events per check-in, each
 `kind` up to 40 characters and `detail` up to 500. Core records the check-in time
 (what the Console's amber/red uses) and writes the events to Activity.

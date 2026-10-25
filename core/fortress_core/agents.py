@@ -27,10 +27,13 @@ ENROL_MAX_FAILURES = 5
 CLOCK_SKEW_SECONDS = 300
 NONCE_MEMORY_SECONDS = 600
 MAX_EVENTS = 200
+MAX_REPORTS = 8                    # sources per check-in, e.g. "block_trainer"
+MAX_REPORT_BYTES = 32 * 1024       # each report, as compact JSON
 MAX_BODY_BYTES = 256 * 1024
 ENROL_CODE_LENGTH = 10
 
 _EVENT_KIND = re.compile(r"^[a-z0-9_]{1,40}$")
+_REPORT_SOURCE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 
 class AgentError(Exception):
@@ -217,13 +220,33 @@ class AgentGate:
             except rules.RuleError:
                 at = rules.format_utc(now)
             clean.append((at, str(e["kind"]), str(e.get("detail", ""))[:500]))
+        reports = self._reports(body.get("reports"))
 
         self.f.store.record_check_in(device["id"], rules.format_utc(now), version, agent_version)
+        for source, report in reports.items():
+            self.f.store.put_report(device["id"], source, rules.format_utc(now), report)
         if body.get("enforcing") is False and not device["released"]:
             clean.append((rules.format_utc(now), "not_enforcing", "Agent reports it is not enforcing"))
         for at, kind, detail in clean:
             self.f.store.log(at, "device", f"{device['id']}: {kind}" + (f": {detail}" if detail else ""))
         return {"latest_version": self.f.store.get("version"), "released": bool(device["released"])}
+
+    @staticmethod
+    def _reports(reports) -> dict:
+        """Latest summaries other apps on the device handed to its Agent, e.g. Block
+        Trainer's logged workouts. Core keeps the newest per source; it never acts on them."""
+        if reports is None:
+            return {}
+        if not isinstance(reports, dict) or len(reports) > MAX_REPORTS:
+            raise AgentError(400, "invalid", f"reports must be an object of at most {MAX_REPORTS} sources")
+        for source, report in reports.items():
+            if not _REPORT_SOURCE.match(source):
+                raise AgentError(400, "invalid", "report sources are a-z, 0-9 and _, starting with a letter")
+            if not isinstance(report, dict):
+                raise AgentError(400, "invalid", f"report {source} must be an object")
+            if len(json.dumps(report, separators=(",", ":"))) > MAX_REPORT_BYTES:
+                raise AgentError(400, "invalid", f"report {source} is larger than {MAX_REPORT_BYTES} bytes")
+        return reports
 
 
 # ---- the HTTP app for the home network --------------------------------------------------

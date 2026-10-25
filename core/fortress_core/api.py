@@ -197,6 +197,17 @@ def create_app(fortress: Fortress, guard: threading.Lock | None = None,
     def latest_bundle(f: Fortress = reader):
         return f.latest_bundle()
 
+    @app.get(API + "/reports")
+    def reports(f: Fortress = reader):
+        """The newest report each enrolled device passed on from another app."""
+        active = {d["id"] for d in f.store.devices()}
+        out: dict = {}
+        for r in f.store.reports():
+            if r["device_id"] in active:
+                out.setdefault(r["device_id"], {})[r["source"]] = {
+                    "received_at": r["received_at"], "report": r["data"]}
+        return out
+
     # -- setup, lock, unlock
 
     @app.post(API + "/setup")

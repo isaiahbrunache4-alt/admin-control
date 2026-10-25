@@ -133,6 +133,11 @@ class MainActivity : Activity() {
                     appendLine()
                     appendLine("Last check-in: ${s.lastSync?.let { local(Instant.parse(it)) } ?: "never"}")
                     s.lastError?.let { appendLine("Last problem: $it") }
+                    if (s.reports.isNotEmpty()) {
+                        appendLine("Passing on: " + s.reports.entries.sortedBy { it.key }.joinToString { (k, r) ->
+                            "$k (${local(Instant.parse(r.at))})"
+                        })
+                    }
                 }
             }
             runOnUiThread {

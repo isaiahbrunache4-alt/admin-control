@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS enrolments (
     expires_at TEXT NOT NULL,
     failures   INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS reports (
+    device_id   TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    data        TEXT NOT NULL,
+    PRIMARY KEY (device_id, source)
+);
 """
 
 # Columns added to `devices` after schema 1, for Agents (docs/agent_protocol.md).
@@ -155,6 +162,22 @@ class Store:
                 "UPDATE devices SET last_seen = ?, version_held = ?, agent_version = ? WHERE id = ?",
                 (seen_at, version, agent_version, device_id),
             )
+
+    # what other apps on a device report through its Agent (docs/agent_protocol.md)
+    def put_report(self, device_id: str, source: str, received_at: str, report: dict) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO reports (device_id, source, received_at, data) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (device_id, source) DO UPDATE SET received_at = excluded.received_at, "
+                "data = excluded.data",
+                (device_id, source, received_at, json.dumps(report, separators=(",", ":"))),
+            )
+
+    def reports(self) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT device_id, source, received_at, data FROM reports ORDER BY device_id, source"
+        )
+        return [{**dict(r), "data": json.loads(r["data"])} for r in rows]
 
     # enrolment codes
     def put_enrolment(self, device_id: str, key: str, expires_at: str) -> None:

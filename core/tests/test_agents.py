@@ -190,6 +190,32 @@ def test_check_in_flags_an_agent_not_enforcing(fortress, tablet):
     assert "tablet: not_enforcing" in fortress.store.activity()[0]["detail"]
 
 
+def test_check_in_stores_app_reports(fortress, tablet):
+    tablet.enrol(tablet.code)
+    report = {"at": "2026-10-19T11:58:00Z", "data": {"v": 1, "bodyweight": [{"date": "2026-10-19", "weight": 251.4}]}}
+    assert tablet.check_in({"version": 1, "reports": {"block_trainer": report}}).status_code == 200
+    got = fortress.store.reports()
+    assert [(r["device_id"], r["source"]) for r in got] == [("tablet", "block_trainer")]
+    assert got[0]["data"] == report
+    # A newer report replaces it; a check-in without reports leaves it alone.
+    newer = {"at": "2026-10-19T12:30:00Z", "data": {"v": 1}}
+    tablet.check_in({"version": 1, "reports": {"block_trainer": newer}})
+    tablet.check_in({"version": 1})
+    assert fortress.store.reports()[0]["data"] == newer
+
+
+@pytest.mark.parametrize("reports", [
+    "x", {"Bad Name": {}}, {"block_trainer": "not an object"},
+    {f"s{i}": {} for i in range(agents.MAX_REPORTS + 1)},
+    {"block_trainer": {"blob": "x" * agents.MAX_REPORT_BYTES}},
+])
+def test_bad_reports_refused(fortress, tablet, reports):
+    tablet.enrol(tablet.code)
+    assert tablet.check_in({"version": 1, "reports": reports}).status_code == 400
+    assert fortress.store.reports() == []
+    assert fortress.store.device("tablet")["version_held"] is None   # nothing recorded
+
+
 @pytest.mark.parametrize("payload", [
     {"version": "1"}, {"version": -1}, {"version": 1, "events": "x"},
     {"version": 1, "events": [{"kind": "Has Spaces"}]},

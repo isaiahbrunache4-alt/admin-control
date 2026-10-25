@@ -60,6 +60,17 @@
             android:directBootAware="true"
             android:exported="false" />
 
+        <!-- Summaries from other apps (Block Trainer) to pass on to Core. Reports only:
+             nothing a sender says changes what Fortress blocks. -->
+        <receiver
+            android:name=".ReportReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.fortress.agent.REPORT" />
+            </intent-filter>
+        </receiver>
+
         <!-- The website filter (Spec 01 §8.1). Only the system can bind it. -->
         <service
             android:name=".FilterVpnService"
