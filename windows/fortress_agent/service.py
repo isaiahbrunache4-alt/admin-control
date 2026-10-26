@@ -15,7 +15,7 @@ from .enforce import list_running_programs, make_domain_check, programs_to_block
 
 SYNC_EVERY = 15 * 60
 PROGRAM_SCAN_EVERY = 2
-DNS_CHECK_EVERY = 30
+DNS_CHECK_EVERY = 10
 DEFAULT_UPSTREAMS = ["1.1.1.1", "9.9.9.9"]
 
 
@@ -192,6 +192,17 @@ class AgentService:
         away from the filter, and then nothing is blocked. Point them back. What they were
         set to becomes the filter's upstream, so that tool's own filtering still applies."""
         if not self.filter or not self._enforcing:
+            return
+        if not self.filter.alive:
+            # A dead filter leaves the PC with no working DNS at all. Start a fresh one.
+            self.agent.log("filter_error", "the website filter had stopped; restarted it")
+            try:
+                self.filter.stop()
+            except Exception:
+                pass
+            self.filter = None
+            state = self.agent.state
+            self._ensure_filter(self.agent.current_payload(), state.device_id or "pc")
             return
         try:
             if not self.platform.dns_drifted():

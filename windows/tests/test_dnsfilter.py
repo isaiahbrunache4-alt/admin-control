@@ -129,3 +129,38 @@ def test_filter_survives_junk(running_filter):
             c.sendto(os.urandom(40), ("127.0.0.1", f.bound_port))
     # Still answering afterwards.
     assert struct.unpack_from("!H", ask(f.bound_port, "www.tiktok.com"), 2)[0] & 0xF == 3
+
+
+def test_filter_survives_a_connection_reset():
+    """On Windows, an ICMP "port unreachable" left by a reply to a client that had given up
+    surfaces as ConnectionResetError on the next receive. That used to end the serving
+    thread, leaving the PC with no working DNS at all."""
+    f = DnsFilter(lambda host: True, [], port=0)
+    f.start()
+    try:
+        real = f._sock
+        resets = {"left": 2}
+
+        class Flaky:
+            def __getattr__(self, name):
+                return getattr(real, name)
+
+            def recvfrom(self, n):
+                if resets["left"]:
+                    resets["left"] -= 1
+                    raise ConnectionResetError(10054, "connection reset by peer")
+                return real.recvfrom(n)
+
+        f._sock = Flaky()
+        time.sleep(0.2)
+        assert f.alive
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as c:
+            c.settimeout(3)
+            c.sendto(build_query("tiktok.com"), ("127.0.0.1", real.getsockname()[1]))
+            reply = c.recv(4096)
+        assert struct.unpack_from("!H", reply, 2)[0] & 0xF == 3
+        assert resets["left"] == 0 and f.alive
+    finally:
+        f._sock = real
+        f.stop()
+    assert not f.alive

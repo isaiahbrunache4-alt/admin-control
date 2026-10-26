@@ -8,4 +8,4 @@ the phones give the same answers, but it is a separate program with no access to
 signing key: nothing typed on the PC changes the rules without the Console and the password.
 """
 
-AGENT_VERSION = "0.1.1"
+AGENT_VERSION = "0.1.2"

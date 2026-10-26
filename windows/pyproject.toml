@@ -1,6 +1,6 @@
 [project]
 name = "fortress-agent-windows"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fortress Agent for Windows: the PC-layer lock (Spec 01, Phases 7-8)"
 requires-python = ">=3.11"
 # fortress-core must be installed in the same environment (pip install -e ..\core).

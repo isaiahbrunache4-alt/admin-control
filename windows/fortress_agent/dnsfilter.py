@@ -11,6 +11,7 @@ The message parsing is plain bytes and is tested on any OS with real UDP packets
 import socket
 import struct
 import threading
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
@@ -113,14 +114,25 @@ class DnsFilter:
             return None
         return ", ".join(f"{host} {n}" for host, n in counts.most_common())
 
+    @property
+    def alive(self) -> bool:
+        """True while the serving thread runs. If it ever stops, nothing on the PC resolves."""
+        return self._thread is not None and self._thread.is_alive()
+
     def _serve(self) -> None:
         while not self._stop.is_set():
             try:
                 data, addr = self._sock.recvfrom(4096)
-            except socket.timeout:
+            except (socket.timeout, ConnectionResetError):
+                # ConnectionResetError: Windows reports here the ICMP "port unreachable" left
+                # by an earlier reply to a client that had already given up. The socket is
+                # fine; stopping on it took the whole filter down.
                 continue
             except OSError:
-                break
+                if self._stop.is_set() or self._sock is None:
+                    break
+                time.sleep(0.1)
+                continue
             try:
                 self._handle(data, addr)
             except Exception:

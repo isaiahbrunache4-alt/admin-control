@@ -225,3 +225,19 @@ def test_dns_is_left_alone_once_released(tmp_path):
         assert svc.platform.points == 1
     finally:
         svc.stop()
+
+
+def test_a_dead_filter_is_restarted(tmp_path):
+    agent, svc = make(tmp_path, clock=lambda: NOON)
+    try:
+        svc.apply()
+        old = svc.filter
+        old._stop.set()                                     # the serving thread ends
+        old._thread.join(timeout=2)
+        assert not old.alive
+        svc._keep_dns()
+        assert svc.filter is not None and svc.filter is not old and svc.filter.alive
+        assert _nxdomain(svc.filter.bound_port, "tiktok.com")
+        assert any(e["kind"] == "filter_error" for e in agent.state.events)
+    finally:
+        svc.stop()
