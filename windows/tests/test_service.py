@@ -177,3 +177,51 @@ def test_domain_check_matches_core_and_follows_the_clock():
         now["t"] = t
         for h in hosts:
             assert check(h) == is_domain_blocked(rules, "pc", h, t), (h, t)
+
+
+class DriftingPlatform(StubPlatform):
+    """Something else on the PC (a network change, another DNS tool) can repoint the
+    adapters away from the filter after it started."""
+
+    def __init__(self):
+        super().__init__()
+        self.points = 0
+        self.drifted = False
+
+    def point_dns_at_filter(self):
+        self.points += 1
+        self.drifted = False
+        return super().point_dns_at_filter()
+
+    def dns_drifted(self):
+        return self.drifted
+
+
+def test_dns_is_pointed_back_when_something_changes_it(tmp_path):
+    agent, svc = make(tmp_path, clock=lambda: NOON)
+    svc.platform = DriftingPlatform()
+    try:
+        svc.apply()
+        assert svc.platform.points == 1
+        svc._keep_dns()
+        assert svc.platform.points == 1                     # still pointed: left alone
+        svc.platform.drifted = True                         # e.g. set to 1.1.1.3
+        svc._keep_dns()
+        assert svc.platform.points == 2 and not svc.platform.drifted
+        assert [e["kind"] for e in agent.state.events].count("dns_reset") == 1
+    finally:
+        svc.stop()
+
+
+def test_dns_is_left_alone_once_released(tmp_path):
+    agent, svc = make(tmp_path, clock=lambda: NOON)
+    svc.platform = DriftingPlatform()
+    try:
+        svc.apply()
+        agent.state.set(released=True)
+        svc.apply()                                         # stands down, restores DNS
+        svc.platform.drifted = True
+        svc._keep_dns()
+        assert svc.platform.points == 1
+    finally:
+        svc.stop()
