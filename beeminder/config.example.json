@@ -11,5 +11,6 @@
     "merchants": ["DoorDash", "Uber Eats", "Grubhub", "Instacart", "Postmates", "Caviar", "Seamless", "Gopuff", "Shipt"]
   },
   "workouts": { "source": "block_trainer", "start": "2026-10-26" },
-  "weight": { "source": "block_trainer", "start": "2026-10-26" }
+  "weight": { "source": "block_trainer", "start": "2026-10-26" },
+  "steps": { "source": "steps", "min": 10000, "start": "2026-10-27" }
 }

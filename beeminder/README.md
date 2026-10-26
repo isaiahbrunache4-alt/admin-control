@@ -10,12 +10,15 @@ Beeminder decides how many missed days it allows before it derails.
 | `deliveries` | at most `max_per_week` delivery orders Monday to Sunday | Pocket Ledger for Windows |
 | `workouts` | last week, every training day in Block Trainer was fully logged (checked on Mondays) | Block Trainer, via Fortress Agent and Core |
 | `weight` | a bodyweight entry dated today | Block Trainer, via Fortress Agent and Core |
+| `steps` | yesterday's step total reached `min`, read by the phone after midnight | Watch → Gadgetbridge → Health Connect → Fortress Agent (0.5.0+) → Core |
 
 Leave a section out of `config.json` to turn that rule off. `devices` is always on.
 
 Block Trainer hands Fortress Agent a summary whenever you log something; the Agent passes
 it to Core at each check-in (`docs/agent_protocol.md`, "reports"), and this script reads
-it from `http://127.0.0.1:47800/api/v1/reports`.
+it from `http://127.0.0.1:47800/api/v1/reports`. Fortress Agent 0.5.0 adds its own
+`steps` report: the last 8 days' totals from Health Connect, read before every check-in
+once you allow it in the app.
 
 ## Files
 

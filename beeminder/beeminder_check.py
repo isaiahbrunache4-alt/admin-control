@@ -14,9 +14,13 @@ every rule below passes:
               new week; on other days it reports progress and passes.
   weight      a bodyweight entry dated today in Block Trainer. The act of logging is what
               counts, not the number.
+  steps       yesterday's step total reached min (10,000). Fortress Agent reads daily
+              totals from Android's Health Connect, where Gadgetbridge puts the watch's
+              steps. Yesterday only counts once the phone has read it after midnight.
 
 Block Trainer's numbers reach this PC through Fortress: Block Trainer hands a summary to
-Fortress Agent on the phone, which passes it to Core at every check-in.
+Fortress Agent on the phone, which passes it to Core at every check-in. Step totals take
+the same road, as the "steps" report.
 
 A failed rule only withholds that day's point. How many missed days the goal allows
 before it derails is set on the goal itself in Beeminder.
@@ -189,6 +193,32 @@ def rule_weight(rule, data, today):
     return False, "no weight logged today", "log it in Block Trainer's bodyweight screen"
 
 
+def rule_steps(rule, data, today):
+    start = date.fromisoformat(rule["start"])
+    day = today - timedelta(days=1)
+    if day < start:
+        return True, f"steps count from {start}", ""
+    need = int(rule.get("min", 10000))
+    if not data:
+        return False, "no step counts from the phone", "allow steps in Fortress Agent (Health Connect)"
+    try:
+        read_on = parse_utc(data["at"]).astimezone().date()
+    except (KeyError, ValueError, TypeError):
+        read_on = None
+    if read_on is None or read_on <= day:
+        return False, f"steps for {day} not read since midnight", "the phone checks in every 15 minutes at home"
+    counts = {}
+    for d in data.get("days", []):
+        try:
+            counts[str(d.get("date", ""))[:10]] = int(d.get("steps") or 0)
+        except (TypeError, ValueError):
+            continue
+    n = counts.get(day.isoformat())
+    if n is None:
+        return False, f"no step count for {day}", "check Gadgetbridge syncs to Health Connect"
+    return n >= need, f"steps {day} {n:,} of {need:,}", ""
+
+
 # ---- one run ----------------------------------------------------------------------------
 
 def evaluate(cfg, now, today, status, reports):
@@ -202,6 +232,9 @@ def evaluate(cfg, now, today, status, reports):
     if "weight" in cfg:
         data = latest_report(reports, cfg["weight"].get("source", "block_trainer"))
         results.append(("weight",) + rule_weight(cfg["weight"], data, today))
+    if "steps" in cfg:
+        data = latest_report(reports, cfg["steps"].get("source", "steps"))
+        results.append(("steps",) + rule_steps(cfg["steps"], data, today))
     return results
 
 
@@ -250,7 +283,7 @@ def main(argv=None):
     today = datetime.now().astimezone().date()
     core = cfg.get("core", CORE)
     status = fetch_json(core + "/status")
-    reports = fetch_json(core + "/reports") if ("workouts" in cfg or "weight" in cfg) else None
+    reports = fetch_json(core + "/reports") if any(k in cfg for k in ("workouts", "weight", "steps")) else None
 
     results = evaluate(cfg, now, today, status, reports)
     for name, passed, summary, detail in results:

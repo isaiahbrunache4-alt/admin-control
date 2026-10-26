@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     private lateinit var code: EditText
     private lateinit var message: TextView
     private lateinit var startFilter: Button
+    private lateinit var allowSteps: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +77,13 @@ class MainActivity : Activity() {
             setOnClickListener { startWebsiteFilter() }
         }
         column.addView(startFilter)
+        // Daily step totals for the PC's Beeminder check. Health Connect asks once.
+        allowSteps = Button(this).apply {
+            text = "Share daily steps with the PC"
+            visibility = View.GONE
+            setOnClickListener { requestPermissions(Steps.PERMISSIONS, REQUEST_STEPS) }
+        }
+        column.addView(allowSteps)
         column.addView(Button(this).apply {
             text = "Check in now"
             setOnClickListener { syncNow() }
@@ -133,6 +141,15 @@ class MainActivity : Activity() {
                     appendLine()
                     appendLine("Last check-in: ${s.lastSync?.let { local(Instant.parse(it)) } ?: "never"}")
                     s.lastError?.let { appendLine("Last problem: $it") }
+                    if (Steps.supported()) {
+                        appendLine(
+                            when {
+                                !Steps.allowed(this@MainActivity) -> "Steps: not shared yet"
+                                !Steps.allowedInBackground(this@MainActivity) -> "Steps: shared only while this app is open"
+                                else -> "Steps: shared at every check-in"
+                            },
+                        )
+                    }
                     if (s.reports.isNotEmpty()) {
                         appendLine("Passing on: " + s.reports.entries.sortedBy { it.key }.joinToString { (k, r) ->
                             "$k (${local(Instant.parse(r.at))})"
@@ -145,6 +162,9 @@ class MainActivity : Activity() {
                 enrolForm.visibility = if (s.enrolled) View.GONE else View.VISIBLE
                 startFilter.visibility =
                     if (applied.deviceOwner && s.enrolled && !s.released && !FilterVpnService.running) View.VISIBLE else View.GONE
+                allowSteps.visibility =
+                    if (s.enrolled && Steps.supported() && !(Steps.allowed(this) && Steps.allowedInBackground(this))) View.VISIBLE
+                    else View.GONE
             }
         }
     }
@@ -202,6 +222,12 @@ class MainActivity : Activity() {
         if (requestCode == REQUEST_VPN && resultCode == RESULT_OK) onVpnApproved()
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_STEPS) return
+        if (Steps.allowed(this)) syncNow() else { say("Steps not shared."); refresh() }
+    }
+
     private fun onVpnApproved() {
         startService(Intent(this, FilterVpnService::class.java))
         message.postDelayed({ refresh() }, 1500)
@@ -215,6 +241,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQUEST_VPN = 1
+        const val REQUEST_STEPS = 2
         val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM HH:mm")
     }
 }

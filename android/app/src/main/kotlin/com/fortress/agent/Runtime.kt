@@ -58,6 +58,8 @@ object Runtime {
         val agent = agent(context)
         // Blocked-site counts since the last check-in, per block-list entry.
         FilterVpnService.filter.takeSummary()?.let { agent.log("sites_blocked", it) }
+        // Daily step totals from Health Connect, once allowed in the app (Beeminder check).
+        Steps.report(context)
         val result = agent.sync(enforcing = Enforcer(context).isDeviceOwner)
         if (result.rulesChanged || result.state.released) apply(context)
         result.error?.let { Log.w(TAG, "sync: $it") }

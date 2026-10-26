@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Blocks start and end on the minute. Granted at install on Android 13+. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Daily step totals from Health Connect for the Beeminder check (Agent 0.5.0). Asked
+         for in the app; nothing else is read. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 
     <application
         android:allowBackup="false"
@@ -25,6 +29,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- What Fortress does with step counts. Health Connect refuses health permissions to
+             apps that don't show this. -->
+        <activity
+            android:name=".HealthPrivacyActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".HealthPrivacyActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Device owner (Spec 01 §7.1). Set from the PC: see android/README.md. -->
         <receiver
